@@ -1,20 +1,10 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import * as schema from "./schema";
 
-const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/song";
+const databaseUrl = process.env.DATABASE_URL || "";
 
-const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
-};
+// Neon HTTP Serverless Client (optimized for Netlify/Serverless & Local)
+export const sql = databaseUrl ? neon(databaseUrl) : null;
+export const db = sql ? drizzle(sql, { schema }) : null;
 
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-  });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
-}
-
-export const db = drizzle(pool);
