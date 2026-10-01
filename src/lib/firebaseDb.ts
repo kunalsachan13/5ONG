@@ -2,11 +2,7 @@
  * Firebase Firestore Database Adapter for 5ONG
  * Provides real-time, scalable NoSQL persistence for Users, Playlists, Likes, History, OTPs, and Rooms.
  */
-import { getApps, initializeApp, cert, type App } from 'firebase-admin/app';
-import { getFirestore as getAdminFirestore, type Firestore } from 'firebase-admin/firestore';
-
 declare global {
-  var __firebaseAdminApp: App | undefined;
   var __firebaseMemoryStore: {
     users: Map<string | number, any>;
     playlists: Map<string | number, any>;
@@ -28,75 +24,8 @@ const memoryStore = (globalThis.__firebaseMemoryStore = globalThis.__firebaseMem
   rooms: new Map(),
 });
 
-function initFirebaseAdmin(): App | null {
-  if (globalThis.__firebaseAdminApp) return globalThis.__firebaseAdminApp;
-
-  const projectId =
-    process.env.FIREBASE_PROJECT_ID ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    'i5ong-music';
-
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-  if (privateKey) {
-    privateKey = privateKey.replace(/\\n/g, '\n');
-  }
-
-  // Only initialize Admin SDK if explicit credentials or Google credentials environment variable exists
-  const hasExplicitCredentials = Boolean(
-    (clientEmail && privateKey) || process.env.GOOGLE_APPLICATION_CREDENTIALS
-  );
-
-  if (!hasExplicitCredentials) {
-    // Return null so the app uses the fast local persistent memory store without throwing "Could not load default credentials"
-    return null;
-  }
-
-  try {
-    const existingApps = getApps();
-    if (existingApps.length > 0) {
-      globalThis.__firebaseAdminApp = existingApps[0]!;
-      return globalThis.__firebaseAdminApp;
-    }
-
-    if (clientEmail && privateKey) {
-      globalThis.__firebaseAdminApp = initializeApp(
-        {
-          credential: cert({
-            projectId,
-            clientEmail,
-            privateKey,
-          }),
-          projectId,
-        },
-        '5ong-admin',
-      );
-      return globalThis.__firebaseAdminApp;
-    }
-
-    globalThis.__firebaseAdminApp = initializeApp(
-      {
-        projectId,
-      },
-      '5ong-admin',
-    );
-    return globalThis.__firebaseAdminApp;
-  } catch (err) {
-    console.warn('[Firebase] Admin initialization note (using resilient fallback store):', err);
-    return null;
-  }
-}
-
-export function getFirestore(): Firestore | null {
-  const app = initFirebaseAdmin();
-  if (!app) return null;
-  try {
-    return getAdminFirestore(app);
-  } catch (err) {
-    console.warn('[Firebase] Firestore unavailable, using in-memory store:', err);
-    return null;
-  }
+export function getFirestore(): any {
+  return null;
 }
 
 export const firebaseDb = {

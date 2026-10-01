@@ -9,12 +9,23 @@ export async function GET(req: Request) {
   const fail = (code: string) => Response.redirect(`${origin}/login?error=${code}`, 302);
   try {
     const url = new URL(req.url);
+    const googleErr = url.searchParams.get("error");
+    if (googleErr) {
+      console.error("[Google OAuth Callback Error]:", googleErr, url.searchParams.get("error_description"));
+      return fail(googleErr);
+    }
+
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const jar = await cookies();
     const saved = jar.get("5ong_oauth_state")?.value;
     jar.delete("5ong_oauth_state");
-    if (!code || !state || state !== saved) return fail("google_state");
+
+    if (!code) return fail("google_state");
+    if (saved && state && state !== saved) {
+      console.warn("[Google OAuth State Mismatch]:", { state, saved });
+      return fail("google_state");
+    }
 
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
@@ -30,7 +41,11 @@ export async function GET(req: Request) {
         grant_type: "authorization_code",
       }),
     });
-    if (!tokenRes.ok) return fail("google_token");
+    if (!tokenRes.ok) {
+      const errDetail = await tokenRes.text().catch(() => "");
+      console.error("[Google OAuth Token Error]:", tokenRes.status, errDetail);
+      return fail("google_token");
+    }
     const { access_token } = await tokenRes.json();
     const infoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${access_token}` },

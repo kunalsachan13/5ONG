@@ -15,7 +15,13 @@ export async function GET(req: Request) {
   }
   const state = crypto.randomBytes(16).toString("hex");
   const jar = await cookies();
-  jar.set("5ong_oauth_state", state, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 600 });
+  jar.set("5ong_oauth_state", state, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600,
+    secure: origin.startsWith("https"),
+  });
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${origin}/api/auth/google/callback`,

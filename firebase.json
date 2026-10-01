@@ -1,7 +1,14 @@
 {
   "hosting": {
     "site": "i5ong",
-    "source": ".",
+    "public": "public",
+    "redirects": [
+      {
+        "source": "**",
+        "destination": "https://5ong.netlify.app",
+        "type": 302
+      }
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",
