@@ -3,11 +3,11 @@ import type { Track } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-async function getItunesTopHits(limit = 50): Promise<Track[]> {
+async function getItunesIndiaTopHits(limit = 50): Promise<Track[]> {
   try {
-    const res = await fetch(`https://itunes.apple.com/us/rss/topsongs/limit=${limit}/json`, {
-      headers: { "User-Agent": "5ONG/2.0 (Music Charts)" },
-      signal: AbortSignal.timeout(5000),
+    const res = await fetch(`https://itunes.apple.com/in/rss/topsongs/limit=${limit}/json`, {
+      headers: { "User-Agent": "5ONG/2.0 (India Music Charts)" },
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -35,20 +35,21 @@ async function getItunesTopHits(limit = 50): Promise<Track[]> {
       };
     });
   } catch (e) {
-    console.warn("iTunes RSS charts note:", e);
+    console.warn("iTunes India charts note:", e);
     return [];
   }
 }
 
-async function getSpotifyTopHits(limit = 50): Promise<Track[]> {
+async function getSpotifyIndiaTopHits(limit = 50): Promise<Track[]> {
   try {
-    const res = await fetch("https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M", {
+    // Spotify Top 50 - India Playlist: 37i9dQZF1DX0XUfTFmZeMt
+    const res = await fetch("https://open.spotify.com/embed/playlist/37i9dQZF1DX0XUfTFmZeMt", {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Language": "en-IN,en;q=0.9",
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return [];
     const html = await res.text();
@@ -69,7 +70,7 @@ async function getSpotifyTopHits(limit = 50): Promise<Track[]> {
         id: `sp_${trackId}`,
         title: item.title || "Unknown Title",
         artist: item.subtitle || "Unknown Artist",
-        album: "Today's Top Hits",
+        album: "Top 50 - India",
         cover,
         coverBig: cover,
         duration: Math.round((item.duration || 180000) / 1000),
@@ -111,21 +112,21 @@ export async function GET(req: Request) {
     } catch (_) {}
   }
 
-  // 1. Primary Global Charts: Official Apple iTunes RSS High-Res Top Charts (guaranteed 600x600 cover artwork)
-  const itunesTracks = await getItunesTopHits(limit);
-  if (itunesTracks.length > 0) {
+  // 1. Primary: Official Apple iTunes RSS High-Res Top Charts for India (crisp 600x600 cover artwork)
+  const indiaTracks = await getItunesIndiaTopHits(limit);
+  if (indiaTracks.length > 0) {
     return Response.json({
-      name: "Global Top 50 Charts",
-      tracks: itunesTracks,
+      name: "Trending in India",
+      tracks: indiaTracks,
       artists: [],
     });
   }
 
-  // 2. Secondary Global Charts: Spotify Today's Top Hits
-  const spTracks = await getSpotifyTopHits(limit);
+  // 2. Secondary: Spotify Top 50 - India
+  const spTracks = await getSpotifyIndiaTopHits(limit);
   if (spTracks.length > 0) {
     return Response.json({
-      name: "Today's Top Hits",
+      name: "Trending in India",
       tracks: spTracks,
       artists: [],
     });
@@ -136,11 +137,11 @@ export async function GET(req: Request) {
     const tracks = await dz<{ data: unknown[] }>(`/chart/0/tracks?limit=${limit}`, 600).catch(() => ({ data: [] }));
     const normalized = normalizeTracks(tracks.data as never[]);
     return Response.json({
-      name: "Top Charts",
+      name: "Trending Songs",
       tracks: normalized,
       artists: [],
     });
   } catch {
-    return Response.json({ name: "Top Charts", tracks: [], artists: [] });
+    return Response.json({ name: "Trending Songs", tracks: [], artists: [] });
   }
 }

@@ -98,7 +98,7 @@ export default function HomePage() {
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-xl font-black">
-            <TrendingUp size={20} className="text-lilac-deep" /> {data?.name ?? "Global Top Charts"}
+            <TrendingUp size={20} className="text-lilac-deep" /> {data?.name ?? "Trending in India"}
           </h2>
           <PlayAllButtons tracks={tracks} />
         </div>
