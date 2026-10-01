@@ -43,6 +43,16 @@ function initFirebaseAdmin(): App | null {
     privateKey = privateKey.replace(/\\n/g, '\n');
   }
 
+  // Only initialize Admin SDK if explicit credentials or Google credentials environment variable exists
+  const hasExplicitCredentials = Boolean(
+    (clientEmail && privateKey) || process.env.GOOGLE_APPLICATION_CREDENTIALS
+  );
+
+  if (!hasExplicitCredentials) {
+    // Return null so the app uses the fast local persistent memory store without throwing "Could not load default credentials"
+    return null;
+  }
+
   try {
     const existingApps = getApps();
     if (existingApps.length > 0) {
