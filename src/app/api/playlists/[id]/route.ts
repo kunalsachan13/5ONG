@@ -28,8 +28,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!name) throw new HttpError(400, "Name required");
     const pl = await firebaseDb.getPlaylist(u.id, id);
     if (!pl) throw new HttpError(404, "Playlist not found");
-    // Firebase update can update playlist name
-    return Response.json({ ok: true });
+    await firebaseDb.updatePlaylist(u.id, id, { name });
+    return Response.json({ ok: true, name });
   } catch (e) {
     return errorResponse(e);
   }

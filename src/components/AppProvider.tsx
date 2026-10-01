@@ -37,9 +37,8 @@ export function useApp() {
   return c;
 }
 
-const LOCAL_LIKES = "5ong.local.likes.v1";
-const LOCAL_HISTORY = "5ong.local.history.v1";
-const LOCAL_PLAYLISTS = "5ong.local.playlists.v1";
+const getStorageKey = (key: string, uid?: string | number | null) =>
+  uid ? `5ong.${uid}.${key}.v2` : `5ong.guest.${key}.v2`;
 
 export default function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(null);
@@ -57,18 +56,6 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
 
-  // Load local storage initial state
-  useEffect(() => {
-    try {
-      const storedLikes = localStorage.getItem(LOCAL_LIKES);
-      if (storedLikes) setLikes(JSON.parse(storedLikes));
-      const storedHist = localStorage.getItem(LOCAL_HISTORY);
-      if (storedHist) setHistory(JSON.parse(storedHist));
-      const storedPl = localStorage.getItem(LOCAL_PLAYLISTS);
-      if (storedPl) setPlaylists(JSON.parse(storedPl));
-    } catch (_) {}
-  }, []);
-
   const refreshLibrary = useCallback(async () => {
     try {
       const r = await fetch("/api/library", { cache: "no-store" });
@@ -78,16 +65,19 @@ export default function AppProvider({ children }: { children: ReactNode }) {
         setHistory(j.history ?? []);
         setPlaylists(j.playlists ?? []);
         try {
-          if (j.likes) localStorage.setItem(LOCAL_LIKES, JSON.stringify(j.likes));
-          if (j.history) localStorage.setItem(LOCAL_HISTORY, JSON.stringify(j.history));
-          if (j.playlists) localStorage.setItem(LOCAL_PLAYLISTS, JSON.stringify(j.playlists));
+          if (user?.id) {
+            localStorage.setItem(getStorageKey("likes", user.id), JSON.stringify(j.likes ?? []));
+            localStorage.setItem(getStorageKey("history", user.id), JSON.stringify(j.history ?? []));
+            localStorage.setItem(getStorageKey("playlists", user.id), JSON.stringify(j.playlists ?? []));
+          }
         } catch (_) {}
       }
     } catch {
       /* offline or network error: use local storage */
     }
-  }, []);
+  }, [user]);
 
+  // Load user session on mount
   useEffect(() => {
     let alive = true;
     fetch("/api/auth/me", { cache: "no-store" })
@@ -104,13 +94,34 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Sync library when user state initializes or changes
   useEffect(() => {
-    if (user) refreshLibrary();
+    const uid = user?.id;
+    try {
+      const storedLikes = localStorage.getItem(getStorageKey("likes", uid));
+      if (storedLikes) setLikes(JSON.parse(storedLikes));
+      else if (!uid) setLikes([]);
+
+      const storedHist = localStorage.getItem(getStorageKey("history", uid));
+      if (storedHist) setHistory(JSON.parse(storedHist));
+      else if (!uid) setHistory([]);
+
+      const storedPl = localStorage.getItem(getStorageKey("playlists", uid));
+      if (storedPl) setPlaylists(JSON.parse(storedPl));
+      else if (!uid) setPlaylists([]);
+    } catch (_) {}
+
+    if (user) {
+      void refreshLibrary();
+    }
   }, [user, refreshLibrary]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    setLikes([]);
+    setHistory([]);
+    setPlaylists([]);
     toast("Signed out");
   }, [toast]);
 
@@ -122,7 +133,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
       const nextLikes = was ? likes.filter((x) => x.id !== t.id) : [t, ...likes];
       setLikes(nextLikes);
       try {
-        localStorage.setItem(LOCAL_LIKES, JSON.stringify(nextLikes));
+        localStorage.setItem(getStorageKey("likes", user?.id), JSON.stringify(nextLikes));
       } catch (_) {}
 
       if (!was) {
@@ -164,7 +175,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
         const updated = [newPl, ...playlists];
         setPlaylists(updated);
         try {
-          localStorage.setItem(LOCAL_PLAYLISTS, JSON.stringify(updated));
+          localStorage.setItem(getStorageKey("playlists", null), JSON.stringify(updated));
         } catch (_) {}
         toast(`Created “${name}” (saved locally)`);
         return newPl;
@@ -225,7 +236,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
       setHistory((h) => {
         const next = [item, ...h.filter((x) => x.id !== t.id)].slice(0, 200);
         try {
-          localStorage.setItem(LOCAL_HISTORY, JSON.stringify(next));
+          localStorage.setItem(getStorageKey("history", user?.id), JSON.stringify(next));
         } catch (_) {}
         return next;
       });
