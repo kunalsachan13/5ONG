@@ -12,14 +12,28 @@ export async function GET(_req: Request, ctx: { params: Promise<{ size: string }
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #cdb8ff 0%, #ffc4dd 55%, #ffe0b8 100%)",
-          color: "#3b3563",
-          fontSize: size * 0.5,
-          fontWeight: 800,
-          letterSpacing: -size * 0.02,
+          background: "linear-gradient(135deg, #ffffff 0%, #faf6ff 60%, #f3ecff 100%)",
+          borderRadius: Math.round(size * 0.28),
+          border: `${Math.max(1, Math.round(size * 0.02))}px solid rgba(205, 184, 255, 0.6)`,
         }}
       >
-        5
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: Math.round(size * 0.82),
+            height: Math.round(size * 0.82),
+            borderRadius: Math.round(size * 0.24),
+            background: "linear-gradient(135deg, #a888f8 0%, #cdb8ff 35%, #ffb3d1 70%, #ffcfa8 100%)",
+            color: "#ffffff",
+            fontSize: Math.round(size * 0.5),
+            fontWeight: 900,
+            textShadow: "0 2px 10px rgba(155, 127, 232, 0.5)",
+          }}
+        >
+          5
+        </div>
       </div>
     ),
     { width: size, height: size },

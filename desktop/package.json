@@ -1,0 +1,10 @@
+{
+  "name": "5ong-desktop",
+  "productName": "5ONG",
+  "version": "1.0.0",
+  "description": "5ONG - Modern Music Streaming, Rooms & Equalizer by Kunal Sachan",
+  "author": "Kunal Sachan <kunalsachan13@gmail.com>",
+  "publisher": "Kunal Sachan",
+  "creator": "Kunal Sachan",
+  "main": "main.js"
+}

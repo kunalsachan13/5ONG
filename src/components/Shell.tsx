@@ -28,6 +28,7 @@ import { useApp } from "@/components/AppProvider";
 import { usePlayer } from "@/components/PlayerProvider";
 import PlayerBar from "@/components/PlayerBar";
 import NowPlaying from "@/components/NowPlaying";
+import Logo from "@/components/Logo";
 
 const NAV = [
   { href: "/", label: "Home", Icon: House },
@@ -56,18 +57,6 @@ const SHORTCUTS: [string, string][] = [
   ["?", "This help"],
 ];
 
-function Logo({ className = "" }: { className?: string }) {
-  return (
-    <Link href="/" className={`flex items-center gap-2.5 ${className}`} aria-label="5ONG home">
-      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-lilac via-pink to-peach text-lg font-black shadow-md shadow-lilac-deep/25">
-        5
-      </span>
-      <span className="text-xl font-black tracking-tight">
-        5<span className="text-lilac-deep">ONG</span>
-      </span>
-    </Link>
-  );
-}
 
 function EditUsernameModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { user, setUser, toast } = useApp();

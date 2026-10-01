@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">5ONG</string>
+    <string name="title_activity_main">5ONG</string>
+    <string name="package_name">com.kunalsachan.song</string>
+    <string name="custom_url_scheme">com.kunalsachan.song</string>
+    <string name="developer_name">Kunal Sachan</string>
+    <string name="publisher_name">Kunal Sachan</string>
+</resources>

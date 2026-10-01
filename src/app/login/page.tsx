@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, Mail, UserPlus, LogIn, Phone, CheckCircle2, AlertCircle } from "lucide-react";
 import { useApp } from "@/components/AppProvider";
 import { Spinner } from "@/components/ui";
+import { SongLogoIcon } from "@/components/Logo";
 
 type Mode = "signin" | "register" | "otp";
 
@@ -158,9 +159,7 @@ function LoginInner() {
   return (
     <div className="mx-auto grid max-w-md gap-6 py-4 md:py-10">
       <div className="text-center">
-        <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-lilac via-pink to-peach text-3xl font-black shadow-lg shadow-lilac-deep/25">
-          5
-        </div>
+        <SongLogoIcon size={68} className="mx-auto mb-3" />
         <h1 className="text-3xl font-black">Sign in to 5ONG</h1>
         <p className="text-sm text-muted">Save playlists, liked songs and enjoy personalized music.</p>
       </div>

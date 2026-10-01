@@ -28,6 +28,15 @@ google_oauth_client.json
 .netlify
 .firebase
 
+# Build binaries & packages
+dist-desktop/
+dist-android/
+android/app/build/
+android/build/
+android/local.properties
+android/.gradle/
+*.apk
+
 # TypeScript cache
 *.tsbuildinfo
 next-env.d.ts
