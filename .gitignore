@@ -23,9 +23,10 @@ yarn-error.log*
 .env
 google_oauth_client.json
 
-# Vercel & Netlify
+# Vercel & Netlify & Firebase
 .vercel
 .netlify
+.firebase
 
 # TypeScript cache
 *.tsbuildinfo
