@@ -3,8 +3,8 @@
  * Provides true relational persistence & user isolation for Users, Playlists, Likes, History, and Rooms.
  */
 import { db } from "@/db";
-import { users, playlists, playlistTracks, likedTracks, listeningLogs, rooms } from "@/db/schema";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { users, playlists, playlistTracks, likedTracks, listeningLogs, rooms, otpCodes, usernameChanges } from "@/db/schema";
+import { eq, and, or, desc, asc, sql } from "drizzle-orm";
 
 declare global {
   var __dbMemoryStore: {
@@ -32,6 +32,7 @@ export const firebaseDb = {
   // ---------------- Users ----------------
   async getUserByEmail(email: string) {
     const cleanEmail = email.toLowerCase().trim();
+    if (!cleanEmail) return null;
     if (db) {
       try {
         const [u] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
@@ -41,9 +42,153 @@ export const firebaseDb = {
       }
     }
     for (const u of memoryStore.users.values()) {
-      if (u.email === cleanEmail) return u;
+      if (u.email?.toLowerCase() === cleanEmail) return u;
     }
     return null;
+  },
+
+  async getUserByUsername(username: string) {
+    const cleanUsername = username.toLowerCase().trim();
+    if (!cleanUsername) return null;
+    if (db) {
+      try {
+        const [u] = await db.select().from(users).where(sql`lower(${users.username}) = ${cleanUsername}`).limit(1);
+        if (u) return u;
+      } catch (e) {
+        console.error("[Neon DB] getUserByUsername error:", e);
+      }
+    }
+    for (const u of memoryStore.users.values()) {
+      if (u.username?.toLowerCase() === cleanUsername) return u;
+    }
+    return null;
+  },
+
+  async getUserByPhone(phone: string) {
+    const cleanPhone = phone.trim().replace(/[\s\-()]/g, "");
+    if (!cleanPhone) return null;
+    const altPhone = cleanPhone.startsWith("+") ? cleanPhone.slice(1) : `+${cleanPhone}`;
+    if (db) {
+      try {
+        const [u] = await db.select().from(users).where(
+          or(eq(users.phoneNumber, cleanPhone), eq(users.phoneNumber, altPhone))
+        ).limit(1);
+        if (u) return u;
+      } catch (e) {
+        console.error("[Neon DB] getUserByPhone error:", e);
+      }
+    }
+    for (const u of memoryStore.users.values()) {
+      if (u.phoneNumber === cleanPhone || u.phoneNumber === altPhone) return u;
+    }
+    return null;
+  },
+
+  async getUserByIdentifier(identifier: string) {
+    const clean = identifier.trim();
+    if (!clean) return null;
+    // 1. If it looks like email
+    if (clean.includes("@")) {
+      const u = await this.getUserByEmail(clean);
+      if (u) return u;
+    }
+    // 2. If it looks like phone number (digits with optional leading +)
+    const digits = clean.replace(/\D/g, "");
+    if (digits.length >= 8 && digits.length <= 15) {
+      const u = await this.getUserByPhone(clean);
+      if (u) return u;
+    }
+    // 3. Look up by username
+    const byUsername = await this.getUserByUsername(clean);
+    if (byUsername) return byUsername;
+
+    // 4. Fallback lookup by email
+    return await this.getUserByEmail(clean);
+  },
+
+  async isUsernameTaken(username: string, excludeUserId?: number | string): Promise<boolean> {
+    const clean = username.trim().toLowerCase();
+    if (!clean) return false;
+    if (db) {
+      try {
+        const found = await db.select({ id: users.id }).from(users).where(sql`lower(${users.username}) = ${clean}`).limit(2);
+        if (excludeUserId !== undefined && excludeUserId !== null) {
+          return found.some((u) => String(u.id) !== String(excludeUserId));
+        }
+        return found.length > 0;
+      } catch (e) {
+        console.error("[Neon DB] isUsernameTaken error:", e);
+      }
+    }
+    for (const u of memoryStore.users.values()) {
+      if (u.username?.toLowerCase() === clean && (!excludeUserId || String(u.id) !== String(excludeUserId))) {
+        return true;
+      }
+    }
+    return false;
+  },
+
+  async isEmailTaken(email: string, excludeUserId?: number | string): Promise<boolean> {
+    const clean = email.trim().toLowerCase();
+    if (!clean) return false;
+    if (db) {
+      try {
+        const found = await db.select({ id: users.id }).from(users).where(eq(users.email, clean)).limit(2);
+        if (excludeUserId !== undefined && excludeUserId !== null) {
+          return found.some((u) => String(u.id) !== String(excludeUserId));
+        }
+        return found.length > 0;
+      } catch (e) {
+        console.error("[Neon DB] isEmailTaken error:", e);
+      }
+    }
+    for (const u of memoryStore.users.values()) {
+      if (u.email?.toLowerCase() === clean && (!excludeUserId || String(u.id) !== String(excludeUserId))) {
+        return true;
+      }
+    }
+    return false;
+  },
+
+  async isPhoneTaken(phone: string, excludeUserId?: number | string): Promise<boolean> {
+    const clean = phone.trim().replace(/[\s\-()]/g, "");
+    if (!clean) return false;
+    const altPhone = clean.startsWith("+") ? clean.slice(1) : `+${clean}`;
+    if (db) {
+      try {
+        const found = await db.select({ id: users.id }).from(users).where(
+          or(eq(users.phoneNumber, clean), eq(users.phoneNumber, altPhone))
+        ).limit(2);
+        if (excludeUserId !== undefined && excludeUserId !== null) {
+          return found.some((u) => String(u.id) !== String(excludeUserId));
+        }
+        return found.length > 0;
+      } catch (e) {
+        console.error("[Neon DB] isPhoneTaken error:", e);
+      }
+    }
+    for (const u of memoryStore.users.values()) {
+      if ((u.phoneNumber === clean || u.phoneNumber === altPhone) && (!excludeUserId || String(u.id) !== String(excludeUserId))) {
+        return true;
+      }
+    }
+    return false;
+  },
+
+  async generateUniqueUsername(base: string): Promise<string> {
+    let clean = base.toLowerCase().replace(/[^a-z0-9_.]/g, "").slice(0, 16);
+    if (clean.length < 3) clean = `user_${clean || "fan"}`;
+    let candidate = clean;
+    let counter = 1;
+    while (await this.isUsernameTaken(candidate)) {
+      candidate = `${clean.slice(0, 14)}_${counter}`;
+      counter++;
+      if (counter > 100) {
+        candidate = `${clean.slice(0, 12)}_${Math.floor(Math.random() * 8999 + 1000)}`;
+        break;
+      }
+    }
+    return candidate;
   },
 
   async getUserByGoogleId(googleId: string) {
@@ -75,15 +220,24 @@ export const firebaseDb = {
     return memoryStore.users.get(sId) || memoryStore.users.get(numId) || null;
   },
 
-  async createUser(data: { email: string; username: string; passwordHash?: string | null; googleId?: string | null; avatarUrl?: string | null }) {
-    const cleanEmail = data.email.toLowerCase().trim();
-    const cleanUsername = data.username.trim();
+  async createUser(data: {
+    email?: string | null;
+    username: string;
+    phoneNumber?: string | null;
+    passwordHash?: string | null;
+    googleId?: string | null;
+    avatarUrl?: string | null;
+  }) {
+    const cleanEmail = data.email ? data.email.toLowerCase().trim() : null;
+    const cleanUsername = data.username.trim().toLowerCase();
+    const cleanPhone = data.phoneNumber ? data.phoneNumber.trim().replace(/[\s\-()]/g, "") : null;
 
     if (db) {
       try {
         const [newUser] = await db.insert(users).values({
           email: cleanEmail,
           username: cleanUsername,
+          phoneNumber: cleanPhone,
           passwordHash: data.passwordHash || null,
           googleId: data.googleId || null,
           avatarUrl: data.avatarUrl || null,
@@ -91,6 +245,7 @@ export const firebaseDb = {
         return newUser;
       } catch (e) {
         console.error("[Neon DB] createUser error:", e);
+        throw e;
       }
     }
 
@@ -99,6 +254,7 @@ export const firebaseDb = {
       id,
       email: cleanEmail,
       username: cleanUsername,
+      phoneNumber: cleanPhone,
       passwordHash: data.passwordHash || null,
       googleId: data.googleId || null,
       avatarUrl: data.avatarUrl || null,
@@ -108,20 +264,162 @@ export const firebaseDb = {
     return payload;
   },
 
-  async updateUser(id: string | number, data: Partial<{ email: string; username: string; passwordHash: string; googleId: string; avatarUrl: string }>) {
+  // ---------------- OTP Storage in Neon DB ----------------
+  async saveOtpCode(params: { target: string; codeHash: string; type: "email" | "phone" }) {
+    const expiresAt = new Date(Date.now() + 10 * 60_000);
+    const cleanTarget = params.target.trim();
+
+    if (db) {
+      try {
+        if (params.type === "email") {
+          const lowerEmail = cleanTarget.toLowerCase();
+          await db.delete(otpCodes).where(eq(otpCodes.email, lowerEmail));
+          await db.insert(otpCodes).values({
+            email: lowerEmail,
+            phoneNumber: null,
+            codeHash: params.codeHash,
+            attempts: 0,
+            expiresAt,
+          });
+        } else {
+          const cleanPhone = cleanTarget.replace(/[\s\-()]/g, "");
+          await db.delete(otpCodes).where(eq(otpCodes.phoneNumber, cleanPhone));
+          await db.insert(otpCodes).values({
+            email: null,
+            phoneNumber: cleanPhone,
+            codeHash: params.codeHash,
+            attempts: 0,
+            expiresAt,
+          });
+        }
+        return true;
+      } catch (e) {
+        console.error("[Neon DB] saveOtpCode error:", e);
+      }
+    }
+
+    // Memory fallback
+    memoryStore.otps.set(cleanTarget.toLowerCase(), {
+      codeHash: params.codeHash,
+      expiresAt: expiresAt.getTime(),
+      attempts: 0,
+      createdAt: Date.now(),
+    });
+    return true;
+  },
+
+  async verifyOtpCode(params: { target: string; codeHash: string; type: "email" | "phone" }) {
+    const cleanTarget = params.target.trim();
+
+    if (db) {
+      try {
+        let rows;
+        if (params.type === "email") {
+          const lowerEmail = cleanTarget.toLowerCase();
+          rows = await db.select().from(otpCodes).where(eq(otpCodes.email, lowerEmail)).limit(1);
+        } else {
+          const cleanPhone = cleanTarget.replace(/[\s\-()]/g, "");
+          rows = await db.select().from(otpCodes).where(eq(otpCodes.phoneNumber, cleanPhone)).limit(1);
+        }
+
+        const otp = rows?.[0];
+        if (!otp) return { valid: false, error: "No pending code found. Request a new one." };
+        if (new Date() > otp.expiresAt) {
+          if (params.type === "email") await db.delete(otpCodes).where(eq(otpCodes.email, cleanTarget.toLowerCase()));
+          else await db.delete(otpCodes).where(eq(otpCodes.phoneNumber, cleanTarget.replace(/[\s\-()]/g, "")));
+          return { valid: false, error: "Code expired. Request a new one." };
+        }
+        if (otp.attempts >= 5) {
+          return { valid: false, error: "Too many wrong attempts. Request a new code." };
+        }
+
+        if (otp.codeHash !== params.codeHash) {
+          await db.update(otpCodes).set({ attempts: otp.attempts + 1 }).where(eq(otpCodes.id, otp.id));
+          return { valid: false, error: "That code is not correct" };
+        }
+
+        // Verified! Delete used code
+        await db.delete(otpCodes).where(eq(otpCodes.id, otp.id));
+        return { valid: true };
+      } catch (e) {
+        console.error("[Neon DB] verifyOtpCode error:", e);
+      }
+    }
+
+    // Memory fallback
+    const mem = memoryStore.otps.get(cleanTarget.toLowerCase());
+    if (!mem) return { valid: false, error: "No pending code found. Request a new one." };
+    if (Date.now() > mem.expiresAt) return { valid: false, error: "Code expired. Request a new one." };
+    if (mem.attempts >= 5) return { valid: false, error: "Too many wrong attempts. Request a new code." };
+    if (mem.codeHash !== params.codeHash) {
+      mem.attempts += 1;
+      return { valid: false, error: "That code is not correct" };
+    }
+    memoryStore.otps.delete(cleanTarget.toLowerCase());
+    return { valid: true };
+  },
+
+  async updateUser(id: string | number, data: Partial<{ email: string; username: string; phoneNumber: string; passwordHash: string; googleId: string; avatarUrl: string }>) {
     const numId = Number(id);
+    const updateData = { ...data };
+    if (updateData.username) updateData.username = updateData.username.trim().toLowerCase();
+    if (updateData.email) updateData.email = updateData.email.trim().toLowerCase();
+    if (updateData.phoneNumber) updateData.phoneNumber = updateData.phoneNumber.trim().replace(/[\s\-()]/g, "");
+
     if (db && !isNaN(numId)) {
       try {
-        const [updated] = await db.update(users).set(data).where(eq(users.id, numId)).returning();
+        const [updated] = await db.update(users).set(updateData).where(eq(users.id, numId)).returning();
         if (updated) return updated;
       } catch (e) {
         console.error("[Neon DB] updateUser error:", e);
       }
     }
     const cur = memoryStore.users.get(id) || {};
-    const updated = { ...cur, ...data, id };
+    const updated = { ...cur, ...updateData, id };
     memoryStore.users.set(id, updated);
     return updated;
+  },
+
+  async getUsernameChangesThisMonth(userId: number | string): Promise<number> {
+    const numId = Number(userId);
+    if (db && !isNaN(numId)) {
+      try {
+        const rows = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(usernameChanges)
+          .where(
+            and(
+              eq(usernameChanges.userId, numId),
+              sql`${usernameChanges.changedAt} >= date_trunc('month', now())`
+            )
+          );
+        return Number(rows[0]?.count ?? 0);
+      } catch (e) {
+        console.error("[Neon DB] getUsernameChangesThisMonth error:", e);
+      }
+    }
+    const history = ((globalThis as any).__usernameChanges = (globalThis as any).__usernameChanges || []);
+    const thisMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    return history.filter((h: any) => String(h.userId) === String(userId) && h.changedAt >= thisMonthStart).length;
+  },
+
+  async recordUsernameChange(userId: number | string, oldUsername: string, newUsername: string) {
+    const numId = Number(userId);
+    const cleanOld = oldUsername.toLowerCase().trim();
+    const cleanNew = newUsername.toLowerCase().trim();
+    if (db && !isNaN(numId)) {
+      try {
+        await db.insert(usernameChanges).values({
+          userId: numId,
+          oldUsername: cleanOld,
+          newUsername: cleanNew,
+        });
+      } catch (e) {
+        console.error("[Neon DB] recordUsernameChange error:", e);
+      }
+    }
+    const history = ((globalThis as any).__usernameChanges = (globalThis as any).__usernameChanges || []);
+    history.push({ userId: String(userId), oldUsername: cleanOld, newUsername: cleanNew, changedAt: Date.now() });
   },
 
   // ---------------- Likes (User Isolated) ----------------

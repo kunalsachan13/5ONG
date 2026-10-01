@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Mail, UserPlus, LogIn } from "lucide-react";
+import { KeyRound, Mail, UserPlus, LogIn, Phone, CheckCircle2, AlertCircle } from "lucide-react";
 import { useApp } from "@/components/AppProvider";
 import { Spinner } from "@/components/ui";
 
@@ -40,19 +40,48 @@ function LoginInner() {
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otpType, setOtpType] = useState<"email" | "phone">("email");
   const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<{ checked: boolean; available: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (user) router.replace("/");
   }, [user, router]);
 
+  // Real-time username check on register
+  useEffect(() => {
+    if (mode !== "register" || !username || username.length < 3) {
+      setUsernameStatus(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`);
+        const data = await res.json();
+        setUsernameStatus({
+          checked: true,
+          available: Boolean(data.available),
+          message: data.message || data.error || (data.available ? "Username available" : "Username taken"),
+        });
+      } catch {
+        // ignore network error
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [username, mode]);
+
   async function post(url: string, body: unknown) {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Something went wrong");
       return j;
@@ -73,20 +102,34 @@ function LoginInner() {
         toast(`Welcome back, ${j.user.username}!`);
       }
     } else if (mode === "register") {
-      const j = await post("/api/auth/register", { email, username, password });
+      const cleanUsername = username.toLowerCase().trim();
+      const j = await post("/api/auth/register", {
+        email: email || undefined,
+        username: cleanUsername,
+        phoneNumber: phoneNumber || undefined,
+        password,
+      });
       if (j) {
         setUser(j.user);
         toast(`Welcome to 5ONG, ${j.user.username}!`);
       }
     } else if (!otpSent) {
-      const j = await post("/api/auth/otp/request", { email });
+      const payload = otpType === "email" ? { email } : { phoneNumber };
+      const j = await post("/api/auth/otp/request", payload);
       if (j) {
         setOtpSent(true);
         setDevCode(j.devCode ?? null);
-        toast(j.delivery === "email" ? "Code sent. Check your inbox." : "Code generated (demo mode)");
+        if (j.delivery === "neon-email") {
+          toast("Neon Auth verification code sent to your email!");
+        } else if (j.delivery === "email") {
+          toast("Code sent to your email.");
+        } else {
+          toast("Verification code generated.");
+        }
       }
     } else {
-      const j = await post("/api/auth/otp/verify", { email, code });
+      const payload = otpType === "email" ? { email, code } : { phoneNumber, code };
+      const j = await post("/api/auth/otp/verify", payload);
       if (j) {
         setUser(j.user);
         toast(`Signed in as ${j.user.username}`);
@@ -103,6 +146,9 @@ function LoginInner() {
       onClick={() => {
         setMode(m);
         setError(null);
+        setOtpSent(false);
+        setCode("");
+        setDevCode(null);
       }}
     >
       <Icon size={15} /> {label}
@@ -116,7 +162,7 @@ function LoginInner() {
           5
         </div>
         <h1 className="text-3xl font-black">Sign in to 5ONG</h1>
-        <p className="text-sm text-muted">Save playlists, likes and join listening rooms.</p>
+        <p className="text-sm text-muted">Save playlists, liked songs and enjoy personalized music.</p>
       </div>
 
       <div className="card flex flex-col gap-4 p-5 md:p-6">
@@ -137,26 +183,141 @@ function LoginInner() {
         <div className="flex gap-1 rounded-full bg-lilac/20 p-1" role="tablist">
           {tab("signin", "Password", LogIn)}
           {tab("register", "Register", UserPlus)}
-          {tab("otp", "Email code", KeyRound)}
+          {tab("otp", "OTP Code", KeyRound)}
         </div>
 
         <form className="flex flex-col gap-3" onSubmit={submit}>
           {mode === "signin" && (
             <>
-              <input className="input" placeholder="Email or username" autoComplete="username" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
-              <input className="input" type="password" placeholder="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <input
+                className="input"
+                placeholder="Email, username or phone number"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                required
+              />
+              <input
+                className="input"
+                type="password"
+                placeholder="Password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </>
           )}
+
           {mode === "register" && (
             <>
-              <input className="input" type="email" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <input className="input" placeholder="Username (letters, numbers, _ .)" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} maxLength={24} />
-              <input className="input" type="password" placeholder="Password (8+ characters)" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+              <input
+                className="input"
+                type="email"
+                placeholder="Email address"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <div className="relative">
+                <input
+                  className="input pr-8"
+                  placeholder="Username (always lowercase, e.g. kunal_s)"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""))}
+                  required
+                  minLength={3}
+                  maxLength={24}
+                />
+                {usernameStatus && (
+                  <div className="absolute right-3 top-3 text-xs" title={usernameStatus.available ? "Username available" : "Username taken"}>
+                    {usernameStatus.available ? (
+                      <CheckCircle2 size={16} className="text-emerald-500" />
+                    ) : (
+                      <AlertCircle size={16} className="text-rose-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {usernameStatus && (
+                <p className={`text-[11px] font-bold ${usernameStatus.available ? "text-emerald-600" : "text-rose-500"}`}>
+                  {usernameStatus.message}
+                </p>
+              )}
+              <input
+                className="input"
+                type="tel"
+                placeholder="Phone number (optional, e.g. +919876543210)"
+                autoComplete="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+              />
+              <input
+                className="input"
+                type="password"
+                placeholder="Password (8+ characters)"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+              />
             </>
           )}
+
           {mode === "otp" && (
             <>
-              <input className="input" type="email" placeholder="Email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={otpSent} />
+              {!otpSent && (
+                <div className="flex gap-2 pb-1">
+                  <button
+                    type="button"
+                    className={`btn flex-1 !py-1.5 !text-xs ${otpType === "email" ? "btn-primary" : "btn-soft"}`}
+                    onClick={() => {
+                      setOtpType("email");
+                      setError(null);
+                    }}
+                  >
+                    <Mail size={13} /> Email OTP (Neon)
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn flex-1 !py-1.5 !text-xs ${otpType === "phone" ? "btn-primary" : "btn-soft"}`}
+                    onClick={() => {
+                      setOtpType("phone");
+                      setError(null);
+                    }}
+                  >
+                    <Phone size={13} /> Phone OTP
+                  </button>
+                </div>
+              )}
+
+              {otpType === "email" ? (
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="Enter your email address"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={otpSent}
+                />
+              ) : (
+                <input
+                  className="input"
+                  type="tel"
+                  placeholder="Enter your phone number (e.g. +919876543210)"
+                  autoComplete="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
+                  disabled={otpSent}
+                />
+              )}
+
               {otpSent && (
                 <>
                   <input
@@ -172,7 +333,7 @@ function LoginInner() {
                   />
                   {devCode && (
                     <p className="rounded-2xl bg-butter/70 p-3 text-center text-xs font-bold">
-                      Email delivery isn’t configured on this server, so here’s your code:{" "}
+                      Verification code:{" "}
                       <button type="button" className="font-mono text-base font-black underline" onClick={() => setCode(devCode)}>
                         {devCode}
                       </button>
@@ -187,23 +348,34 @@ function LoginInner() {
                       setDevCode(null);
                     }}
                   >
-                    Use a different email / resend
+                    Use a different {otpType === "email" ? "email" : "phone number"} / resend
                   </button>
                 </>
               )}
             </>
           )}
+
           {error && (
             <p role="alert" className="rounded-2xl bg-pink/50 px-3 py-2 text-sm font-bold">
               {error}
             </p>
           )}
+
           <button className="btn btn-primary !py-3" disabled={busy}>
             {busy && <Spinner size={16} />}
-            {mode === "signin" ? "Sign in" : mode === "register" ? "Create account" : otpSent ? "Verify & sign in" : "Send me a code"}
+            {mode === "signin"
+              ? "Sign in"
+              : mode === "register"
+              ? "Create account"
+              : otpSent
+              ? "Verify & sign in"
+              : "Send verification code"}
           </button>
         </form>
-        <p className="text-center text-[11px] text-muted">Passwords are hashed with bcrypt. One-time codes expire in 10 minutes.</p>
+
+        <p className="text-center text-[11px] text-muted">
+          Usernames are strictly unique and lowercased. One-time codes expire in 10 minutes.
+        </p>
       </div>
     </div>
   );

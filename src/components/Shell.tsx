@@ -20,6 +20,9 @@ import {
   X,
   Link2,
   Keyboard,
+  AtSign,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { useApp } from "@/components/AppProvider";
 import { usePlayer } from "@/components/PlayerProvider";
@@ -66,9 +69,150 @@ function Logo({ className = "" }: { className?: string }) {
   );
 }
 
+function EditUsernameModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { user, setUser, toast } = useApp();
+  const [newUsername, setNewUsername] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<{ changesRemaining: number; changesThisMonth: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [avail, setAvail] = useState<{ checked: boolean; available: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      setNewUsername(user.username);
+      setError(null);
+      setAvail(null);
+      fetch("/api/auth/username")
+        .then((r) => r.json())
+        .then((d) => setInfo(d))
+        .catch(() => {});
+    }
+  }, [isOpen, user]);
+
+  useEffect(() => {
+    if (!newUsername || newUsername.toLowerCase() === user?.username.toLowerCase() || newUsername.length < 3) {
+      setAvail(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(newUsername.toLowerCase())}`);
+        const data = await res.json();
+        setAvail({
+          checked: true,
+          available: Boolean(data.available),
+          message: data.message || data.error || (data.available ? "Username available" : "Username taken"),
+        });
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [newUsername, user]);
+
+  if (!isOpen || !user) return null;
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const clean = newUsername.trim().toLowerCase();
+      const res = await fetch("/api/auth/username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newUsername: clean }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update username");
+      setUser(data.user);
+      toast(data.message || `Username updated to @${clean}!`);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Failed to update username");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const remaining = info ? info.changesRemaining : 2;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="card w-full max-w-sm p-5 flex flex-col gap-4 shadow-2xl pop-in">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-extrabold flex items-center gap-2">
+            <AtSign size={18} className="text-lilac-deep" /> Change Username
+          </h3>
+          <button type="button" onClick={onClose} className="rounded-full p-1 hover:bg-lilac/30">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="rounded-2xl bg-lilac/20 p-3 text-xs flex flex-col gap-1">
+          <p className="font-bold">
+            Monthly limit: <span className="text-lilac-deep font-black">{remaining} of 2</span> changes left
+          </p>
+          <p className="text-muted text-[11px]">
+            Users can change their unique username a maximum of 2 times per month. Usernames are automatically converted to lowercase.
+          </p>
+        </div>
+
+        <form onSubmit={handleSave} className="flex flex-col gap-3">
+          <div className="relative">
+            <input
+              className="input pr-8"
+              value={newUsername}
+              placeholder="new_username"
+              onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""))}
+              required
+              minLength={3}
+              maxLength={24}
+              disabled={busy || remaining <= 0}
+            />
+            {avail && (
+              <div className="absolute right-3 top-3 text-xs" title={avail.available ? "Username available" : "Username taken"}>
+                {avail.available ? (
+                  <CheckCircle2 size={16} className="text-emerald-500" />
+                ) : (
+                  <AlertCircle size={16} className="text-rose-500" />
+                )}
+              </div>
+            )}
+          </div>
+
+          {avail && (
+            <p className={`text-[11px] font-bold ${avail.available ? "text-emerald-600" : "text-rose-500"}`}>
+              {avail.message}
+            </p>
+          )}
+
+          {error && (
+            <p className="rounded-xl bg-pink/50 p-2 text-xs font-bold text-rose-700">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn btn-ghost" disabled={busy}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={busy || remaining <= 0 || (avail && !avail.available) || newUsername.toLowerCase() === user.username.toLowerCase()}
+            >
+              {busy ? "Saving..." : "Save Username"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function UserMenu() {
   const { user, logout, ready } = useApp();
   const [open, setOpen] = useState(false);
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -103,9 +247,20 @@ function UserMenu() {
       {open && (
         <div className="pop-in glass absolute right-0 top-12 z-50 w-56 rounded-2xl p-1.5" role="menu">
           <div className="px-3 py-2">
-            <p className="text-sm font-extrabold">{user.username}</p>
-            <p className="truncate text-xs text-muted">{user.email}</p>
+            <p className="text-sm font-extrabold flex items-center gap-1.5">
+              <span>@{user.username}</span>
+            </p>
+            <p className="truncate text-xs text-muted">{user.email || user.phoneNumber || "5ONG user"}</p>
           </div>
+          <button
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30"
+            onClick={() => {
+              setOpen(false);
+              setEditUsernameOpen(true);
+            }}
+          >
+            <AtSign size={16} /> Edit username
+          </button>
           <Link href="/library" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30" onClick={() => setOpen(false)}>
             <Library size={16} /> Your library
           </Link>
@@ -120,6 +275,7 @@ function UserMenu() {
           </button>
         </div>
       )}
+      <EditUsernameModal isOpen={editUsernameOpen} onClose={() => setEditUsernameOpen(false)} />
     </div>
   );
 }

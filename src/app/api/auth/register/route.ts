@@ -8,19 +8,60 @@ export async function POST(req: Request) {
     rateLimit(`reg:${ip}`, 10, 60_000);
     const body = await req.json().catch(() => ({}));
     const email = String(body.email ?? "").trim().toLowerCase();
-    const username = String(body.username ?? "").trim().toLowerCase();
+    const rawUsername = String(body.username ?? "").trim().toLowerCase();
+    const phone = String(body.phoneNumber || body.phone || "").trim().replace(/[\s\-()]/g, "");
     const password = String(body.password ?? "");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Enter a valid email address");
-    if (!/^[a-z0-9_.]{3,24}$/.test(username))
-      throw new HttpError(400, "Username: 3–24 chars, letters, numbers, _ or .");
-    if (password.length < 8) throw new HttpError(400, "Password must be at least 8 characters");
 
-    // Check existing via Firebase
-    const existing = await firebaseDb.getUserByEmail(email);
-    if (existing) throw new HttpError(409, "That email is already registered");
+    // 1. Username validation & lowercase enforcement
+    if (!rawUsername) throw new HttpError(400, "Please choose a username");
+    const username = rawUsername.toLowerCase();
+    if (!/^[a-z0-9_.]{3,24}$/.test(username)) {
+      throw new HttpError(400, "Username must be 3–24 characters (letters, numbers, _ or .)");
+    }
+
+    // 2. Contact validation (email or phone required)
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new HttpError(400, "Enter a valid email address");
+    }
+    if (phone && !/^\+?\d{8,15}$/.test(phone)) {
+      throw new HttpError(400, "Enter a valid phone number (8-15 digits)");
+    }
+    if (!email && !phone) {
+      throw new HttpError(400, "Please provide an email address or phone number");
+    }
+
+    // 3. Password validation
+    if (password.length < 8) {
+      throw new HttpError(400, "Password must be at least 8 characters");
+    }
+
+    // 4. Strict Uniqueness Checks
+    const isTaken = await firebaseDb.isUsernameTaken(username);
+    if (isTaken) {
+      throw new HttpError(409, "That username is already taken. Please choose another username.");
+    }
+
+    if (email) {
+      const emailTaken = await firebaseDb.isEmailTaken(email);
+      if (emailTaken) {
+        throw new HttpError(409, "That email is already registered. Please sign in or use another email.");
+      }
+    }
+
+    if (phone) {
+      const phoneTaken = await firebaseDb.isPhoneTaken(phone);
+      if (phoneTaken) {
+        throw new HttpError(409, "That phone number is already registered.");
+      }
+    }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const u = await firebaseDb.createUser({ email, username, passwordHash });
+    const u = await firebaseDb.createUser({
+      email: email || null,
+      username,
+      phoneNumber: phone || null,
+      passwordHash,
+    });
     await createSession(u.id, u);
     return Response.json({ user: toPublicUser(u) });
   } catch (e) {

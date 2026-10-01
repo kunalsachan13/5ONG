@@ -11,7 +11,13 @@ const secret = new TextEncoder().encode(
 export const SESSION_COOKIE = "5ong_session";
 
 export function toPublicUser(u: any): PublicUser {
-  return { id: u.id, email: u.email, username: u.username, avatarUrl: u.avatarUrl || null };
+  return {
+    id: u.id,
+    email: u.email || null,
+    username: u.username,
+    phoneNumber: u.phoneNumber || u.phone_number || null,
+    avatarUrl: u.avatarUrl || u.avatar_url || null,
+  };
 }
 
 export async function createSession(userId: string | number, userMeta?: Partial<PublicUser>) {

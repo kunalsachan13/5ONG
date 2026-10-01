@@ -68,9 +68,11 @@ export async function GET(req: Request) {
       }
     }
     if (!u) {
+      const candidateBase = (info.name || email.split("@")[0]).toLowerCase().replace(/[^a-z0-9_.]/g, "");
+      const uniqueUsername = await firebaseDb.generateUniqueUsername(candidateBase || "user");
       u = await firebaseDb.createUser({
         email,
-        username: info.name || uniqueUsernameBase(email),
+        username: uniqueUsername,
         googleId,
         avatarUrl: info.picture ?? null,
       });

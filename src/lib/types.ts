@@ -18,8 +18,9 @@ export interface Track {
 
 export interface PublicUser {
   id: string | number;
-  email: string;
+  email?: string | null;
   username: string;
+  phoneNumber?: string | null;
   avatarUrl: string | null;
 }
 

@@ -11,8 +11,9 @@ import type { Track } from "@/lib/types";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
+  email: text("email").unique(),
   username: text("username").notNull().unique(),
+  phoneNumber: text("phone_number").unique(),
   passwordHash: text("password_hash"),
   googleId: text("google_id").unique(),
   avatarUrl: text("avatar_url"),
@@ -21,11 +22,22 @@ export const users = pgTable("users", {
 
 export const otpCodes = pgTable("otp_codes", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull(),
+  email: text("email"),
+  phoneNumber: text("phone_number"),
   codeHash: text("code_hash").notNull(),
   attempts: integer("attempts").notNull().default(0),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const usernameChanges = pgTable("username_changes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  oldUsername: text("old_username").notNull(),
+  newUsername: text("new_username").notNull(),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
 });
 
 export const playlists = pgTable("playlists", {
