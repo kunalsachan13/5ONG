@@ -4,7 +4,7 @@ export async function GET() {
   return Response.json({
     ok: true,
     service: "5ONG Music Platform",
-    database: "firebase",
+    database: "neon",
     timestamp: new Date().toISOString(),
   });
 }
