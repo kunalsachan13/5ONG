@@ -2,8 +2,6 @@
 
 A state-of-the-art modern music streaming and discovery web platform. Built with **Next.js 16 (App Router + Turbopack)**, **Tailwind CSS**, **Firebase Firestore**, and a resilient **Dual-Engine Audio System** supporting direct 320kbps CDNs and full-length YouTube streaming.
 
-![5ONG Music Platform](https://raw.githubusercontent.com/kunalsachan13/JF-Player/main/public/banner.png)
-
 ---
 
 ## ✨ Features
@@ -57,25 +55,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 npm run build
 npm run start
 ```
-
----
-
-## 🌐 Deploy to Netlify
-
-This project is pre-configured with `netlify.toml` and `@netlify/plugin-nextjs`.
-
-1. **Push code to GitHub** (see below).
-2. Connect your repository on [Netlify](https://app.netlify.com).
-3. Set the build settings:
-   - **Base directory**: `.`
-   - **Build command**: `npm run build`
-   - **Publish directory**: `.next`
-4. Add environment variables in **Netlify Site Settings > Environment variables**:
-   - `GOOGLE_CLIENT_ID`: Your Google OAuth Client ID (from Google Cloud Console)
-   - `GOOGLE_CLIENT_SECRET`: Your Google OAuth Client Secret
-   - `AUTH_SECRET`: Your production JWT secret key
-   - `FIREBASE_PROJECT_ID`: `jf-player-510117`
-5. Click **Deploy Site**!
 
 ---
 
