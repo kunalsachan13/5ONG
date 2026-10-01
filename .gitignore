@@ -37,3 +37,5 @@ next-env.d.ts
 Thumbs.db
 .neon
 .agents/mcp_config.json
+
+.vercel
