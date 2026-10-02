@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     if (!name) throw new HttpError(400, "Give your playlist a name");
     const tracks = (Array.isArray(body.tracks) ? body.tracks : []) as Track[];
     const playlist = await firebaseDb.createPlaylist(u.id, name, tracks);
-    return Response.json({ playlist });
+    return Response.json({ playlist, id: playlist.id });
   } catch (e) {
     return errorResponse(e);
   }

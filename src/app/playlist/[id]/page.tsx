@@ -64,19 +64,19 @@ export default function PlaylistPage({ params }: { params: Promise<{ id: string 
       const res = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: data.name }),
+        body: JSON.stringify({
+          name: data.name,
+          tracks: data.tracks || [],
+        }),
       });
       if (!res.ok) throw new Error("Failed to create playlist");
       const json = await res.json();
-      if (data.tracks.length > 0) {
-        await fetch(`/api/playlists/${json.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tracks: data.tracks }),
-        });
-      }
+      const newId = json.playlist?.id || json.id;
       await refreshLibrary();
-      toast(`Saved “${data.name}” to your library!`);
+      toast(`Saved “${data.name}” (${data.tracks.length} tracks) to your library!`);
+      if (newId) {
+        router.push(`/playlist/${newId}`);
+      }
     } catch {
       toast("Failed to save playlist", "err");
     } finally {
@@ -102,7 +102,13 @@ export default function PlaylistPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  const isCatalog = Boolean(data.isPublic || String(id).startsWith("saavn_") || String(id).startsWith("dz_"));
+  const isCatalog = Boolean(
+    data.isPublic ||
+      String(id).startsWith("saavn_") ||
+      String(id).startsWith("dz_") ||
+      String(id).startsWith("spotify_") ||
+      String(id).startsWith("sp_")
+  );
 
   return (
     <div className="w-full flex flex-col gap-6 transition-all duration-300">
@@ -121,7 +127,7 @@ export default function PlaylistPage({ params }: { params: Promise<{ id: string 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-black uppercase tracking-wider text-ink/60 dark:text-white/70">
-                {isCatalog ? `${data.source || "Featured"} Playlist` : "Your Playlist"}
+                {isCatalog ? "Featured Playlist" : "Your Playlist"}
               </span>
               {isCatalog && (
                 <span className="rounded-full bg-lilac/30 dark:bg-white/15 px-2 py-0.5 text-[10px] font-black text-lilac-deep dark:text-white">
