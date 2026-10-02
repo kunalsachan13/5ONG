@@ -27,18 +27,18 @@ function SearchInner() {
   if (!url) {
     return (
       <div className="flex w-full flex-col gap-6 transition-all duration-300">
-        <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach p-6 shadow-lg shadow-lilac-deep/15 transition-all duration-300 md:p-8">
-          <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/40 blur-2xl pointer-events-none" />
+        <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach dark:from-[#2e1c4e] dark:via-[#3d1c44] dark:to-[#38233b] p-6 shadow-lg shadow-lilac-deep/15 dark:shadow-black/40 border border-transparent dark:border-white/10 transition-all duration-300 md:p-8">
+          <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 dark:bg-lilac-deep/20 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/40 dark:bg-pink-deep/15 blur-2xl pointer-events-none" />
           <div className="relative max-w-xl">
-            <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1 text-xs font-black text-ink">
+            <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 dark:bg-white/10 dark:text-lilac-deep px-3 py-1 text-xs font-black text-ink">
               <Search size={13} /> Explore catalog
             </p>
             <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink">
               Find any song, artist or album.
             </h1>
-            <p className="mt-2 text-sm font-semibold text-ink/75 md:text-base">
-              Use the search bar above — or press <kbd className="rounded bg-white/80 px-1.5 py-0.5 font-black text-ink shadow-xs">/</kbd> anywhere to start typing.
+            <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-ink/80 md:text-base">
+              Use the search bar above — or press <kbd className="rounded bg-white/80 dark:bg-white/10 px-1.5 py-0.5 font-black text-ink shadow-xs">/</kbd> anywhere to start typing.
             </p>
           </div>
         </section>

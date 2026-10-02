@@ -16,14 +16,23 @@ export async function GET(req: Request) {
     }
 
     const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
+    const rawState = url.searchParams.get("state") || "";
+    const [stateRandom, statePlatform, stateDesktopPort] = rawState.split(":");
     const jar = await cookies();
     const saved = jar.get("5ong_oauth_state")?.value;
     jar.delete("5ong_oauth_state");
 
+    const platformCookie = jar.get("5ong_oauth_platform")?.value;
+    const desktopPortCookie = jar.get("5ong_oauth_desktop_port")?.value;
+    jar.delete("5ong_oauth_platform");
+    jar.delete("5ong_oauth_desktop_port");
+
+    const platform = platformCookie || statePlatform || "";
+    const desktopPort = desktopPortCookie || (stateDesktopPort && stateDesktopPort !== "0" ? stateDesktopPort : "");
+
     if (!code) return fail("google_state");
-    if (saved && state && state !== saved) {
-      console.warn("[Google OAuth State Mismatch]:", { state, saved });
+    if (saved && stateRandom && stateRandom !== saved) {
+      console.warn("[Google OAuth State Mismatch]:", { stateRandom, saved });
       return fail("google_state");
     }
 
@@ -82,9 +91,16 @@ export async function GET(req: Request) {
 
     const userAgent = req.headers.get("user-agent") || "";
     const isAndroid = /android/i.test(userAgent);
+    const isDesktop = platform === "desktop" || Boolean(desktopPort);
 
-    if (isAndroid) {
+    if (isAndroid || isDesktop) {
       const appUrl = `song://auth-callback?token=${encodeURIComponent(sessionToken)}`;
+      const loopbackUrl = desktopPort
+        ? `http://127.0.0.1:${desktopPort}/auth-callback?token=${encodeURIComponent(sessionToken)}`
+        : "";
+
+      const deviceLabel = isDesktop ? "5ONG Desktop App" : "5ONG Android App";
+
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -112,7 +128,7 @@ export async function GET(req: Request) {
       border: 1px solid rgba(255, 255, 255, 0.9);
       border-radius: 28px;
       padding: 36px 24px;
-      max-width: 360px;
+      max-width: 380px;
       width: 100%;
       box-shadow: 0 10px 30px rgba(155, 127, 232, 0.15);
     }
@@ -158,13 +174,23 @@ export async function GET(req: Request) {
   <div class="card">
     <img src="/logo.png" alt="5ONG" class="logo" />
     <h1>Signed in as @${u.username}</h1>
-    <p>Opening the 5ONG App...</p>
-    <a id="openBtn" href="${appUrl}" class="btn">Return to 5ONG App</a>
+    <p>Opening ${deviceLabel}...</p>
+    <a id="openBtn" href="${appUrl}" class="btn">Return to ${deviceLabel}</a>
     <a href="/" class="btn-sub">Or continue in Web Browser</a>
   </div>
   <script>
-    // Automatically trigger app switch
+    // 1. If desktop port is active, immediately signal local Electron loopback
+    if (${JSON.stringify(loopbackUrl)}) {
+      try {
+        fetch(${JSON.stringify(loopbackUrl)}, { mode: 'no-cors' }).catch(function(){});
+      } catch (e) {}
+    }
+    // 2. Automatically trigger app switch via protocol
     window.location.href = "${appUrl}";
+    // 3. Close tab after brief moment if opened in popup
+    setTimeout(function() {
+      try { window.close(); } catch (e) {}
+    }, 3000);
   </script>
 </body>
 </html>`;

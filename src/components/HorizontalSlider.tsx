@@ -85,7 +85,7 @@ export function HorizontalSlider({
               disabled={!canScrollLeft}
               aria-label="Scroll left"
               title="Scroll left"
-              className="icon-btn !h-8 !w-8 bg-white/70 border border-ink/5 shadow-xs hover:bg-white hover:text-ink disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
+              className="icon-btn !h-8 !w-8 bg-white/80 dark:bg-[#201838] border border-ink/10 dark:border-white/10 shadow-xs hover:bg-white dark:hover:bg-[#2f2452] text-ink dark:text-[#f2eefa] hover:scale-105 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
             >
               <ChevronLeft size={18} strokeWidth={2.5} />
             </button>
@@ -95,7 +95,7 @@ export function HorizontalSlider({
               disabled={!canScrollRight}
               aria-label="Scroll right"
               title="Scroll right"
-              className="icon-btn !h-8 !w-8 bg-white/70 border border-ink/5 shadow-xs hover:bg-white hover:text-ink disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
+              className="icon-btn !h-8 !w-8 bg-white/80 dark:bg-[#201838] border border-ink/10 dark:border-white/10 shadow-xs hover:bg-white dark:hover:bg-[#2f2452] text-ink dark:text-[#f2eefa] hover:scale-105 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
             >
               <ChevronRight size={18} strokeWidth={2.5} />
             </button>
@@ -110,7 +110,7 @@ export function HorizontalSlider({
               disabled={!canScrollLeft}
               aria-label="Scroll left"
               title="Scroll left"
-              className="icon-btn !h-8 !w-8 bg-white/70 border border-ink/5 shadow-xs hover:bg-white hover:text-ink disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
+              className="icon-btn !h-8 !w-8 bg-white/80 dark:bg-[#201838] border border-ink/10 dark:border-white/10 shadow-xs hover:bg-white dark:hover:bg-[#2f2452] text-ink dark:text-[#f2eefa] hover:scale-105 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
             >
               <ChevronLeft size={18} strokeWidth={2.5} />
             </button>
@@ -120,7 +120,7 @@ export function HorizontalSlider({
               disabled={!canScrollRight}
               aria-label="Scroll right"
               title="Scroll right"
-              className="icon-btn !h-8 !w-8 bg-white/70 border border-ink/5 shadow-xs hover:bg-white hover:text-ink disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
+              className="icon-btn !h-8 !w-8 bg-white/80 dark:bg-[#201838] border border-ink/10 dark:border-white/10 shadow-xs hover:bg-white dark:hover:bg-[#2f2452] text-ink dark:text-[#f2eefa] hover:scale-105 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed disabled:pointer-events-none transition"
             >
               <ChevronRight size={18} strokeWidth={2.5} />
             </button>

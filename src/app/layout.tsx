@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import AppProvider from "@/components/AppProvider";
 import PlayerProvider from "@/components/PlayerProvider";
+import ThemeProvider from "@/components/ThemeProvider";
 import Shell from "@/components/Shell";
 
 export const metadata: Metadata = {
@@ -32,6 +33,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("5ong_theme");var d=t==="dark"||(!t||t==="system")&&window.matchMedia("(prefers-color-scheme: dark)").matches;if(d)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");}catch(e){}})();`,
+          }}
+        />
         <link rel="icon" type="image/png" href="/logo.png?v=2" />
         <link rel="shortcut icon" href="/logo.png?v=2" />
         <link rel="apple-touch-icon" href="/logo.png?v=2" />
@@ -43,11 +49,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="antialiased" suppressHydrationWarning>
-        <AppProvider>
-          <PlayerProvider>
-            <Shell>{children}</Shell>
-          </PlayerProvider>
-        </AppProvider>
+        <ThemeProvider>
+          <AppProvider>
+            <PlayerProvider>
+              <Shell>{children}</Shell>
+            </PlayerProvider>
+          </AppProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

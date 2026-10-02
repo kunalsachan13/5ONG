@@ -7,21 +7,46 @@ export const dynamic = "force-dynamic";
 
 // GET /api/auth/google -> Initiates standard OAuth2 redirect flow
 export async function GET(req: Request) {
+  const reqUrl = new URL(req.url);
+  const platform = reqUrl.searchParams.get("platform") || "";
+  const desktopPort = reqUrl.searchParams.get("desktop_port") || "";
+
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const origin = getOrigin(req);
   if (!clientId || !clientSecret) {
     return Response.redirect(`${origin}/login?error=google_not_configured`, 302);
   }
-  const state = crypto.randomBytes(16).toString("hex");
+  const stateRandom = crypto.randomBytes(16).toString("hex");
+  // Encode platform & port into state so it roundtrips through Google even if third-party cookies are blocked
+  const state = platform ? `${stateRandom}:${platform}:${desktopPort || "0"}` : stateRandom;
+  
   const jar = await cookies();
-  jar.set("5ong_oauth_state", state, {
+  jar.set("5ong_oauth_state", stateRandom, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
     maxAge: 600,
     secure: origin.startsWith("https"),
   });
+  if (platform) {
+    jar.set("5ong_oauth_platform", platform, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+      secure: origin.startsWith("https"),
+    });
+  }
+  if (desktopPort) {
+    jar.set("5ong_oauth_desktop_port", desktopPort, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+      secure: origin.startsWith("https"),
+    });
+  }
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${origin}/api/auth/google/callback`,

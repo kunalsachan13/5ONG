@@ -23,12 +23,18 @@ import {
   AtSign,
   CheckCircle2,
   AlertCircle,
+  Camera,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useApp } from "@/components/AppProvider";
 import { usePlayer } from "@/components/PlayerProvider";
+import { useTheme } from "@/components/ThemeProvider";
 import PlayerBar from "@/components/PlayerBar";
 import NowPlaying from "@/components/NowPlaying";
 import Logo from "@/components/Logo";
+import EditAvatarModal from "@/components/EditAvatarModal";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/", label: "Home", Icon: House },
@@ -200,15 +206,17 @@ function EditUsernameModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
 function UserMenu() {
   const { user, logout, ready } = useApp();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [editUsernameOpen, setEditUsernameOpen] = useState(false);
+  const [editAvatarOpen, setEditAvatarOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
-  if (!ready) return <div className="h-10 w-10 animate-pulse rounded-full bg-white/60" />;
+  if (!ready) return <div className="h-10 w-10 animate-pulse rounded-full bg-white/60 dark:bg-white/10" />;
   if (!user)
     return (
       <Link href="/login" className="btn btn-primary">
@@ -218,31 +226,40 @@ function UserMenu() {
   return (
     <div className="relative" ref={ref}>
       <button
-        className="flex items-center gap-2 rounded-full bg-white/80 py-1 pl-1 pr-3 shadow-sm"
+        className="flex items-center gap-2 rounded-full bg-white/80 dark:bg-[#201938] border border-ink/5 dark:border-white/10 py-1 pl-1 pr-3 shadow-sm hover:scale-[1.02] active:scale-[0.98] transition"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         {user.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full" referrerPolicy="no-referrer" />
+          <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" referrerPolicy="no-referrer" />
         ) : (
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-sm font-black">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-sm font-black text-white">
             {user.username[0]?.toUpperCase()}
           </span>
         )}
         <span className="hidden max-w-24 truncate text-sm font-bold sm:block">{user.username}</span>
       </button>
       {open && (
-        <div className="pop-in glass absolute right-0 top-12 z-50 w-56 rounded-2xl p-1.5" role="menu">
-          <div className="px-3 py-2">
+        <div className="pop-in glass absolute right-0 top-12 z-50 w-56 rounded-2xl p-1.5 shadow-xl" role="menu">
+          <div className="px-3 py-2 border-b border-ink/5 dark:border-white/10 mb-1">
             <p className="text-sm font-extrabold flex items-center gap-1.5">
               <span>@{user.username}</span>
             </p>
             <p className="truncate text-xs text-muted">{user.email || user.phoneNumber || "5ONG user"}</p>
           </div>
           <button
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30"
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left"
+            onClick={() => {
+              setOpen(false);
+              setEditAvatarOpen(true);
+            }}
+          >
+            <Camera size={16} className="text-lilac-deep" /> Change profile photo
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left"
             onClick={() => {
               setOpen(false);
               setEditUsernameOpen(true);
@@ -250,11 +267,24 @@ function UserMenu() {
           >
             <AtSign size={16} /> Edit username
           </button>
-          <Link href="/library" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30" onClick={() => setOpen(false)}>
+          <Link href="/library" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition" onClick={() => setOpen(false)}>
             <Library size={16} /> Your library
           </Link>
           <button
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left"
+            onClick={toggleTheme}
+          >
+            <span className="flex items-center gap-2">
+              {resolvedTheme === "dark" ? <Sun size={16} className="text-butter" /> : <Moon size={16} className="text-lilac-deep" />}
+              <span>Dark mode</span>
+            </span>
+            <span className="text-[11px] font-extrabold text-muted uppercase">
+              {resolvedTheme === "dark" ? "On" : "Off"}
+            </span>
+          </button>
+          <div className="my-1 border-t border-ink/5 dark:border-white/10" />
+          <button
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition text-left"
             onClick={() => {
               setOpen(false);
               logout();
@@ -265,6 +295,7 @@ function UserMenu() {
         </div>
       )}
       <EditUsernameModal isOpen={editUsernameOpen} onClose={() => setEditUsernameOpen(false)} />
+      <EditAvatarModal isOpen={editAvatarOpen} onClose={() => setEditAvatarOpen(false)} />
     </div>
   );
 }
@@ -562,6 +593,7 @@ export default function Shell({ children }: { children: ReactNode }) {
           <div className="flex flex-1 justify-center md:justify-start min-w-0">
             <SearchBox />
           </div>
+          <ThemeToggle />
           <UserMenu />
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-44 sm:px-6 md:px-8 md:pb-28">

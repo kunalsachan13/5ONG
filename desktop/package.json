@@ -15,6 +15,12 @@
     "appId": "com.kunalsachan.song",
     "productName": "5ONG",
     "copyright": "Copyright © 2026 Kunal Sachan",
+    "protocols": [
+      {
+        "name": "5ONG Protocol",
+        "schemes": ["song"]
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "icon.ico"
