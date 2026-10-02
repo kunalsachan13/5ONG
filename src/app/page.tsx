@@ -7,6 +7,7 @@ import { usePlayer } from "@/components/PlayerProvider";
 import { PlayAllButtons, TrackList } from "@/components/TrackList";
 import { Cover, Spinner } from "@/components/ui";
 import GenreChips from "@/components/GenreChips";
+import HorizontalSlider from "@/components/HorizontalSlider";
 import { useJson } from "@/lib/useJson";
 import type { Track } from "@/lib/types";
 
@@ -57,42 +58,33 @@ export default function HomePage() {
       </section>
 
       {recent.length > 0 && (
-        <section className="w-full">
-          <h2 className="mb-3 text-xl font-black">Jump back in</h2>
-          <div className="no-scrollbar flex w-full gap-4 overflow-x-auto pb-2 scroll-smooth">
-            {recent.map((t) => (
-              <button key={t.id} className="group w-36 shrink-0 text-left" onClick={() => playList(recent, recent.indexOf(t))}>
-                <div className="relative">
-                  <Cover src={t.coverBig || t.cover} size={144} rounded="rounded-2xl" className="shadow-md transition group-hover:-translate-y-1 group-hover:shadow-xl" />
-                  <span className="absolute bottom-2 right-2 grid h-9 w-9 translate-y-1 place-items-center rounded-full bg-white text-lilac-deep opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100">
-                    <Play size={16} fill="currentColor" />
-                  </span>
-                </div>
-                <p className="mt-2 truncate text-sm font-extrabold">{t.title}</p>
-                <p className="truncate text-xs text-muted">{t.artist}</p>
-              </button>
-            ))}
-          </div>
-        </section>
+        <HorizontalSlider title="Jump back in" step={300}>
+          {recent.map((t, idx) => (
+            <button key={t.id} className="group w-36 shrink-0 text-left" onClick={() => playList(recent, idx)}>
+              <div className="relative">
+                <Cover src={t.coverBig || t.cover} size={144} rounded="rounded-2xl" className="shadow-md transition group-hover:-translate-y-1 group-hover:shadow-xl" />
+                <span className="absolute bottom-2 right-2 grid h-9 w-9 translate-y-1 place-items-center rounded-full bg-white text-lilac-deep opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100">
+                  <Play size={16} fill="currentColor" />
+                </span>
+              </div>
+              <p className="mt-2 truncate text-sm font-extrabold">{t.title}</p>
+              <p className="truncate text-xs text-muted">{t.artist}</p>
+            </button>
+          ))}
+        </HorizontalSlider>
       )}
 
-      <section className="w-full">
-        <h2 className="mb-3 text-xl font-black">Browse by genre</h2>
-        <GenreChips />
-      </section>
+      <GenreChips title="Browse by genre" />
 
       {data?.artists && data.artists.length > 0 && (
-        <section className="w-full">
-          <h2 className="mb-3 text-xl font-black">Popular artists</h2>
-          <div className="no-scrollbar flex w-full gap-5 overflow-x-auto pb-2 scroll-smooth">
-            {data.artists.map((a) => (
-              <Link key={a.id} href={`/search?artist=${a.id}&name=${encodeURIComponent(a.name)}`} className="group w-28 shrink-0 text-center">
-                <Cover src={a.picture} size={112} rounded="rounded-full" className="shadow-md transition group-hover:scale-105" />
-                <p className="mt-2 truncate text-sm font-extrabold">{a.name}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+        <HorizontalSlider title="Popular artists" containerClassName="gap-5" step={300}>
+          {data.artists.map((a) => (
+            <Link key={a.id} href={`/search?artist=${a.id}&name=${encodeURIComponent(a.name)}`} className="group w-28 shrink-0 text-center">
+              <Cover src={a.picture} size={112} rounded="rounded-full" className="shadow-md transition group-hover:scale-105" />
+              <p className="mt-2 truncate text-sm font-extrabold">{a.name}</p>
+            </Link>
+          ))}
+        </HorizontalSlider>
       )}
 
       <section>

@@ -3,11 +3,23 @@
 import Link from "next/link";
 import { GRADIENTS } from "@/components/ui";
 import { useJson } from "@/lib/useJson";
+import { HorizontalSlider } from "@/components/HorizontalSlider";
 
-export default function GenreChips() {
+export default function GenreChips({
+  title,
+  className = "",
+}: {
+  title?: React.ReactNode;
+  className?: string;
+}) {
   const { data } = useJson<{ genres: { id: string; name: string; picture: string }[] }>("/api/music/genres");
   return (
-    <div className="no-scrollbar flex w-full gap-3 overflow-x-auto pb-2 scroll-smooth">
+    <HorizontalSlider
+      title={title}
+      className={className}
+      containerClassName="gap-3"
+      step={320}
+    >
       {(data?.genres ?? Array.from({ length: 8 }, () => null)).map((g, i) => (
         <Link
           key={g?.id ?? i}
@@ -21,6 +33,7 @@ export default function GenreChips() {
           <span className="relative">{g?.name ?? ""}</span>
         </Link>
       ))}
-    </div>
+    </HorizontalSlider>
   );
 }
+

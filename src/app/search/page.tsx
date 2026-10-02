@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import { PlayAllButtons, TrackList } from "@/components/TrackList";
 import { Cover, EmptyState, Spinner } from "@/components/ui";
 import GenreChips from "@/components/GenreChips";
+import HorizontalSlider from "@/components/HorizontalSlider";
 import { useJson } from "@/lib/useJson";
 import type { Track } from "@/lib/types";
 
@@ -41,8 +42,7 @@ function SearchInner() {
             </p>
           </div>
         </section>
-        <h2 className="text-xl font-black">Browse genres</h2>
-        <GenreChips />
+        <GenreChips title="Browse genres" />
       </div>
     );
   }
@@ -57,14 +57,14 @@ function SearchInner() {
         <PlayAllButtons tracks={tracks} />
       </div>
       {data?.artists && data.artists.length > 0 && (
-        <div className="no-scrollbar flex gap-5 overflow-x-auto pb-2">
+        <HorizontalSlider title="Related artists" containerClassName="gap-5" step={260}>
           {data.artists.map((a) => (
             <Link key={a.id} href={`/search?artist=${a.id}&name=${encodeURIComponent(a.name)}`} className="w-24 shrink-0 text-center">
               <Cover src={a.picture} size={96} rounded="rounded-full" />
               <p className="mt-1.5 truncate text-xs font-extrabold">{a.name}</p>
             </Link>
           ))}
-        </div>
+        </HorizontalSlider>
       )}
       {loading && <div className="grid place-items-center py-16"><Spinner size={28} /></div>}
       {error && !loading && <p className="card p-4 text-sm font-semibold text-muted">⚠ {error}</p>}
