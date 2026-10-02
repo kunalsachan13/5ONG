@@ -17,12 +17,22 @@ class RoomChatManager {
   ): RoomChatMessage {
     const clean = code.toUpperCase().trim();
     const list = this.chats.get(clean) || [];
+    const trimmedText = msg.text.trim().slice(0, 500);
+
+    // Prevent duplicate consecutive system messages
+    if (msg.userId === "system") {
+      const lastMsg = list[list.length - 1];
+      if (lastMsg && lastMsg.userId === "system" && lastMsg.text === trimmedText) {
+        return lastMsg;
+      }
+    }
+
     const newMsg: RoomChatMessage = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       userId: msg.userId,
       userName: msg.userName,
       userAvatar: msg.userAvatar || null,
-      text: msg.text.trim().slice(0, 500),
+      text: trimmedText,
       timestamp: Date.now(),
     };
     // Keep up to 100 recent messages per room

@@ -49,13 +49,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
     // If current host has disconnected and is no longer active, reassign to a random active listener
     if (activeMembers.length > 0 && !activeMembers.some((m: any) => String(m.userId) === String(hostId))) {
       const randomMember = activeMembers[Math.floor(Math.random() * activeMembers.length)];
-      hostId = randomMember.userId;
-      hostName = randomMember.name;
-      roomChatManager.addMessage(code, {
-        userId: "system",
-        userName: "System",
-        text: `Previous host disconnected. ${hostName} is now the host.`,
-      });
+      const newHostId = randomMember.userId;
+      const newHostName = randomMember.name;
+      if (String(newHostId) !== String(hostId)) {
+        hostId = newHostId;
+        hostName = newHostName;
+        roomChatManager.addMessage(code, {
+          userId: "system",
+          userName: "System",
+          text: `Previous host disconnected. ${hostName} is now the host.`,
+        });
+      }
     }
 
     // Save active members and current host back so all users see current presence

@@ -806,8 +806,14 @@ export const firebaseDb = {
     if (db) {
       try {
         const [r] = await db.select().from(rooms).where(eq(rooms.code, cleanCode)).limit(1);
-        if (r && r.state) {
-          return { ...r.state, hostId: r.hostId, code: r.code };
+        if (r) {
+          const state: any = typeof r.state === "object" && r.state ? r.state : {};
+          return {
+            ...state,
+            hostId: r.hostId ?? state.hostId,
+            hostName: state.hostName ?? "host",
+            code: r.code,
+          };
         }
       } catch (e) {
         console.error("[Neon DB] getRoom error:", e);
@@ -823,9 +829,13 @@ export const firebaseDb = {
         const [existing] = await db.select().from(rooms).where(eq(rooms.code, cleanCode)).limit(1);
         if (existing) {
           const merged = { ...(typeof existing.state === "object" && existing.state ? existing.state : {}), ...data };
+          const updateData: any = { state: merged, stateUpdatedAt: new Date() };
+          if (data.hostId !== undefined && data.hostId !== null) {
+            updateData.hostId = Number(data.hostId) || existing.hostId;
+          }
           await db
             .update(rooms)
-            .set({ state: merged, stateUpdatedAt: new Date() })
+            .set(updateData)
             .where(eq(rooms.code, cleanCode));
         } else {
           await db.insert(rooms).values({
