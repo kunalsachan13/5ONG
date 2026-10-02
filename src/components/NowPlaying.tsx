@@ -45,7 +45,18 @@ function PlayerTab() {
     <div className="mx-auto grid h-full w-full max-w-6xl min-h-0 gap-6 overflow-y-auto lg:grid-cols-[minmax(280px,380px)_1fr] lg:items-center">
       <div className="flex flex-col items-center gap-4">
         <div className={`relative ${p.playing ? "[animation:floaty_5s_ease-in-out_infinite]" : ""}`}>
-          <div className="absolute -inset-3 rounded-[2.2rem] bg-gradient-to-br from-lilac via-pink to-peach opacity-60 blur-2xl" />
+          {/* Dynamic matching album color bloom */}
+          {t.coverBig || t.cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={t.coverBig || t.cover}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 m-auto h-[90%] w-[90%] rounded-full object-cover blur-[55px] opacity-60 dark:opacity-75 pointer-events-none transform-gpu scale-95"
+            />
+          ) : null}
+          {/* Soft ambient radial atmospheric glow */}
+          <div className="absolute inset-0 m-auto h-[88%] w-[88%] rounded-full bg-gradient-to-tr from-purple-500/35 via-pink-500/30 to-rose-400/25 blur-[65px] opacity-60 pointer-events-none transform-gpu" />
           <Cover src={t.coverBig || t.cover} size={300} rounded="rounded-[2rem]" className="relative !h-auto !w-[min(70vw,300px)] aspect-square shadow-2xl lg:!w-[340px]" />
         </div>
         <div className="w-full text-center">
