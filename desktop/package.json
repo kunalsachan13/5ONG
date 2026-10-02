@@ -6,5 +6,35 @@
   "author": "Kunal Sachan <kunalsachan13@gmail.com>",
   "publisher": "Kunal Sachan",
   "creator": "Kunal Sachan",
-  "main": "main.js"
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "44.5.1"
+  },
+  "build": {
+    "electronVersion": "44.5.1",
+    "appId": "com.kunalsachan.song",
+    "productName": "5ONG",
+    "copyright": "Copyright © 2026 Kunal Sachan",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "5ONG",
+      "uninstallDisplayName": "5ONG (by Kunal Sachan)"
+    },
+    "directories": {
+      "output": "../dist-installer"
+    },
+    "files": [
+      "main.js",
+      "icon.png",
+      "icon.ico",
+      "package.json"
+    ]
+  }
 }

@@ -142,6 +142,10 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   const repeatRef = useRef<RepeatMode>("off");
   const radioRef = useRef(true);
   const eqRef = useRef<EqState>(DEFAULT_EQ);
+  const volumeRef = useRef(0.85);
+  const mutedRef = useRef(false);
+  volumeRef.current = volume;
+  mutedRef.current = muted;
   const pendingStart = useRef(0);
   const loggedRef = useRef(false);
   const errorStreak = useRef(0);
@@ -316,6 +320,10 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     }
     if (vid) {
       setSourceType("youtube");
+      const targetVol = typeof volumeRef.current === "number" && !isNaN(volumeRef.current) ? Math.max(0, Math.min(1, volumeRef.current)) : 0.85;
+      youtubeAudio.setVolume(targetVol);
+      if (mutedRef.current) youtubeAudio.mute();
+      else youtubeAudio.unMute();
       const started = await youtubeAudio.play(vid);
       if (started) {
         if (startAt > 0) youtubeAudio.seekTo(startAt);
@@ -347,6 +355,8 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       }
 
       let directSuccess = false;
+      const targetVol = typeof volumeRef.current === "number" && !isNaN(volumeRef.current) ? Math.max(0, Math.min(1, volumeRef.current)) : 0.85;
+      const targetMuted = Boolean(mutedRef.current);
 
       // 1. Primary: Resolve direct JioSaavn 320kbps verified audio CDN stream
       try {
@@ -358,14 +368,16 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         if (streamUrl && (streamUrl.includes("saavncdn") || streamUrl.includes("jiosaavn") || streamUrl.startsWith("http"))) {
           if (a.crossOrigin !== "anonymous") a.crossOrigin = "anonymous";
           a.src = streamUrl;
-          a.volume = typeof volume === "number" && !isNaN(volume) ? Math.max(0, Math.min(1, volume)) : 0.85;
-          a.muted = Boolean(muted);
+          a.volume = targetVol;
+          a.muted = targetMuted;
           a.playbackRate = playbackRate;
           setSourceType("saavn");
           if (autoplay) {
             try {
               if (acRef.current?.state === "suspended") acRef.current.resume().catch(() => {});
               await a.play();
+              a.volume = targetVol;
+              a.muted = targetMuted;
               setPlaying(true);
               directSuccess = true;
             } catch (err: any) {
@@ -387,8 +399,8 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
           setSourceType("deezer");
           if (a.crossOrigin !== "anonymous") a.crossOrigin = "anonymous";
           a.src = `/api/stream/${t.id}`;
-          a.volume = typeof volume === "number" && !isNaN(volume) ? Math.max(0, Math.min(1, volume)) : 0.85;
-          a.muted = Boolean(muted);
+          a.volume = targetVol;
+          a.muted = targetMuted;
           if (autoplay) {
             a.play().catch((err) => {
               if (err?.name !== "AbortError") setPlaying(false);
@@ -631,13 +643,22 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
 
   const setVolume = useCallback((v: number) => {
     const c = Math.max(0, Math.min(1, v));
+    volumeRef.current = c;
     setVolumeState(c);
-    if (c > 0) setMuted(false);
+    if (c > 0) {
+      mutedRef.current = false;
+      setMuted(false);
+    }
+    const a = audioRef.current;
+    if (a) a.volume = c;
     youtubeAudio.setVolume(c);
   }, []);
   const toggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
+      mutedRef.current = next;
+      const a = audioRef.current;
+      if (a) a.muted = next;
       if (next) youtubeAudio.mute();
       else youtubeAudio.unMute();
       return next;
@@ -645,6 +666,8 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    volumeRef.current = volume;
+    mutedRef.current = muted;
     const a = audioRef.current;
     if (a) {
       a.volume = typeof volume === "number" && !isNaN(volume) ? Math.max(0, Math.min(1, volume)) : 0.85;
@@ -1000,7 +1023,11 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     a.volume = typeof volume === "number" && !isNaN(volume) ? Math.max(0, Math.min(1, volume)) : 0.85;
     a.muted = Boolean(muted);
 
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      a.volume = typeof volumeRef.current === "number" && !isNaN(volumeRef.current) ? Math.max(0, Math.min(1, volumeRef.current)) : 0.85;
+      a.muted = Boolean(mutedRef.current);
+      setPlaying(true);
+    };
     const onPause = () => setPlaying(false);
     const onTime = () => {
       setPosition(a.currentTime);

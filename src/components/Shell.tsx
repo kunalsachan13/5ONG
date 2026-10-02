@@ -346,13 +346,30 @@ function HelpModal() {
   );
 }
 
-function Sidebar() {
+function Sidebar({
+  isExpanded,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  isExpanded: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
   const path = usePathname();
   const { playlists, user, likes } = useApp();
   const { setHelpOpen } = usePlayer();
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-1 p-4 md:flex">
-      <Logo className="mb-5 px-2" />
+    <aside
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={`hidden shrink-0 flex-col gap-1 p-3.5 md:flex transition-all duration-300 ease-in-out select-none border-r border-white/50 bg-white/25 backdrop-blur-md z-40 ${
+        isExpanded ? "w-64" : "w-[76px]"
+      }`}
+    >
+      <div className={`mb-4 flex items-center ${isExpanded ? "px-2 justify-between" : "justify-center"}`}>
+        <Logo size={36} showText={isExpanded} href="/" />
+      </div>
+
       <nav className="flex flex-col gap-1" aria-label="Main">
         {NAV.map(({ href, label, Icon }) => {
           const active = href === "/" ? path === "/" : path.startsWith(href);
@@ -360,46 +377,96 @@ function Sidebar() {
             <Link
               key={href}
               href={href}
+              title={!isExpanded ? label : undefined}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-extrabold transition-colors ${
-                active ? "bg-white shadow-sm" : "text-muted hover:bg-white/60 hover:text-ink"
+              className={`flex items-center gap-3.5 rounded-2xl py-2.5 text-sm font-extrabold transition-all duration-200 ${
+                isExpanded ? "px-3.5" : "justify-center px-0"
+              } ${
+                active ? "bg-white shadow-sm text-ink" : "text-muted hover:bg-white/60 hover:text-ink"
               }`}
             >
-              <Icon size={19} className={active ? "text-lilac-deep" : ""} />
-              {label}
+              <Icon size={20} className={active ? "text-lilac-deep shrink-0" : "shrink-0"} />
+              {isExpanded && <span className="truncate whitespace-nowrap animate-in fade-in duration-200">{label}</span>}
             </Link>
           );
         })}
       </nav>
-      <div className="mt-5 flex items-center justify-between px-3.5">
-        <span className="text-xs font-black uppercase tracking-wider text-muted">Playlists</span>
-        <Link href="/library?new=1" className="icon-btn !h-7 !w-7" aria-label="New playlist">
-          <Plus size={15} />
-        </Link>
+
+      {/* Playlists & Library Divider */}
+      <div className={`mt-5 flex items-center ${isExpanded ? "justify-between px-3.5" : "justify-center"}`}>
+        {isExpanded ? (
+          <>
+            <span className="text-xs font-black uppercase tracking-wider text-muted">Playlists</span>
+            <Link href="/library?new=1" className="icon-btn !h-7 !w-7" aria-label="New playlist" title="New playlist">
+              <Plus size={15} />
+            </Link>
+          </>
+        ) : (
+          <div className="h-px w-8 bg-ink/10 my-1" />
+        )}
       </div>
-      <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
-        <Link href="/library" className="flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-bold text-muted hover:bg-white/60 hover:text-ink">
-          <Heart size={16} className="text-pink-deep" fill="currentColor" /> Liked Songs
-          {likes.length > 0 && <span className="ml-auto text-xs">{likes.length}</span>}
+
+      <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden">
+        <Link
+          href="/library"
+          title={!isExpanded ? `Liked Songs (${likes.length})` : undefined}
+          className={`flex items-center gap-3.5 rounded-xl py-2 text-sm font-bold text-muted hover:bg-white/60 hover:text-ink transition-all ${
+            isExpanded ? "px-3.5" : "justify-center px-0"
+          }`}
+        >
+          <Heart size={18} className="text-pink-deep shrink-0" fill="currentColor" />
+          {isExpanded && (
+            <>
+              <span className="truncate">Liked Songs</span>
+              {likes.length > 0 && <span className="ml-auto text-xs font-black">{likes.length}</span>}
+            </>
+          )}
         </Link>
-        {playlists.map((p) => (
+
+        {isExpanded &&
+          playlists.map((p) => (
+            <Link
+              key={p.id}
+              href={`/playlist/${p.id}`}
+              className={`flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-bold hover:bg-white/60 hover:text-ink transition-all ${
+                path === `/playlist/${p.id}` ? "bg-white/70 text-ink" : "text-muted"
+              }`}
+            >
+              <ListMusic size={16} className="shrink-0" />
+              <span className="truncate">{p.name}</span>
+            </Link>
+          ))}
+
+        {!isExpanded && playlists.length > 0 && (
           <Link
-            key={p.id}
-            href={`/playlist/${p.id}`}
-            className={`flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-bold hover:bg-white/60 hover:text-ink ${
-              path === `/playlist/${p.id}` ? "bg-white/70" : "text-muted"
-            }`}
+            href="/library"
+            title="Your Playlists"
+            className="flex items-center justify-center rounded-xl py-2 text-muted hover:bg-white/60 hover:text-ink"
           >
-            <ListMusic size={16} /> <span className="truncate">{p.name}</span>
+            <ListMusic size={18} className="shrink-0" />
           </Link>
-        ))}
-        {!user && <p className="px-3.5 py-2 text-xs text-muted">Sign in to save playlists and liked songs.</p>}
+        )}
+
+        {isExpanded && !user && <p className="px-3.5 py-2 text-xs text-muted">Sign in to save playlists and liked songs.</p>}
       </div>
+
       <div className="mt-2 flex flex-col gap-1 text-xs text-muted">
-        <button className="flex items-center gap-2 rounded-xl px-3.5 py-2 font-bold hover:bg-white/60" onClick={() => setHelpOpen(true)}>
-          <Keyboard size={15} /> Keyboard shortcuts <kbd className="ml-auto rounded bg-white px-1.5">?</kbd>
+        <button
+          className={`flex items-center gap-2 rounded-xl py-2 font-bold hover:bg-white/60 transition-all ${
+            isExpanded ? "px-3.5" : "justify-center px-0"
+          }`}
+          onClick={() => setHelpOpen(true)}
+          title={!isExpanded ? "Keyboard shortcuts (?)" : undefined}
+        >
+          <Keyboard size={18} className="shrink-0" />
+          {isExpanded && (
+            <>
+              <span className="truncate">Shortcuts</span>
+              <kbd className="ml-auto rounded bg-white px-1.5 py-0.5 text-[10px] font-black">?</kbd>
+            </>
+          )}
         </button>
-        <InstallButton />
+        {isExpanded && <InstallButton />}
       </div>
     </aside>
   );
@@ -437,7 +504,10 @@ function MobileNav() {
   const items = [...NAV.slice(0, 3), NAV[4]];
   const { setPanel, panel } = usePlayer();
   return (
-    <nav className="glass mx-2 mb-2 flex items-center justify-around rounded-3xl px-1 py-1 md:hidden" aria-label="Main">
+    <nav
+      className="glass mx-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around rounded-3xl px-1.5 py-1.5 shadow-lg shadow-lilac/15 md:hidden"
+      aria-label="Main"
+    >
       {items.map(({ href, label, Icon }) => {
         const active = href === "/" ? path === "/" : path.startsWith(href);
         return (
@@ -445,20 +515,22 @@ function MobileNav() {
             key={href}
             href={href}
             onClick={() => setPanel(null)}
-            className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1.5 text-[10px] font-extrabold ${
-              active && !panel ? "bg-lilac/40 text-ink" : "text-muted"
+            className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
+              active && !panel ? "bg-white/80 text-ink shadow-xs" : "text-muted"
             }`}
           >
-            <Icon size={19} />
+            <Icon size={20} className={active && !panel ? "text-lilac-deep" : ""} />
             {label}
           </Link>
         );
       })}
       <button
-        className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1.5 text-[10px] font-extrabold ${panel === "eq" ? "bg-lilac/40 text-ink" : "text-muted"}`}
+        className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
+          panel === "eq" ? "bg-white/80 text-ink shadow-xs" : "text-muted"
+        }`}
         onClick={() => setPanel(panel === "eq" ? null : "eq")}
       >
-        <SlidersHorizontal size={19} />
+        <SlidersHorizontal size={20} className={panel === "eq" ? "text-lilac-deep" : ""} />
         EQ
       </button>
     </nav>
@@ -466,26 +538,42 @@ function MobileNav() {
 }
 
 export default function Shell({ children }: { children: ReactNode }) {
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
+
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 px-4 py-3 md:px-8 md:py-4">
-          <Logo className="md:hidden" />
-          <div className="flex flex-1 justify-center md:justify-start">
+      <Sidebar
+        isExpanded={sidebarHovered}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+      />
+      <div
+        className="flex min-w-0 flex-1 flex-col transition-all duration-300"
+        onMouseEnter={() => setSidebarHovered(false)}
+      >
+        <header className="flex items-center gap-2.5 px-3 py-2.5 sm:px-6 md:px-8 md:py-4">
+          <Logo className="md:hidden" size={32} />
+          <div className="flex flex-1 justify-center md:justify-start min-w-0">
             <SearchBox />
           </div>
           <UserMenu />
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-48 md:px-8 md:pb-32">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-44 sm:px-6 md:px-8 md:pb-28">
+          {children}
+        </main>
       </div>
       <NowPlaying />
-      <div className="fixed inset-x-0 bottom-0 z-50 md:left-64">
+      <div
+        className={`fixed inset-x-0 bottom-0 z-50 transition-[left] duration-300 ease-in-out ${
+          sidebarHovered ? "md:left-64" : "md:left-[76px]"
+        }`}
+      >
         <PlayerBar />
         <MobileNav />
       </div>

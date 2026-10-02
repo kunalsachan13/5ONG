@@ -29,12 +29,22 @@ class YouTubeAudioService {
   private pendingVideoId: string | null = null;
   private _isPlaying = false;
   private _currentDuration = 0;
+  private currentVolume = 0.85;
+  private isMuted = false;
   private containerId = 'song-hidden-yt-player-container';
   private targetDivId = 'song-hidden-yt-player';
   private videoIdCache: Map<string, string> = new Map();
 
   constructor() {
     if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('song:player:settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.volume === 'number') this.currentVolume = parsed.volume;
+          if (typeof parsed.muted === 'boolean') this.isMuted = parsed.muted;
+        }
+      } catch (_) {}
       this.initIframeApi();
     }
   }
@@ -278,8 +288,12 @@ class YouTubeAudioService {
               onReady: (event: any) => {
                 this.isPlayerReady = true;
                 try {
-                  event.target.unMute();
-                  event.target.setVolume(100);
+                  if (this.isMuted) {
+                    event.target.mute();
+                  } else {
+                    event.target.unMute();
+                    event.target.setVolume(Math.round(this.currentVolume * 100));
+                  }
                   if (this.currentVideoId && this.currentVideoId !== videoId) {
                     event.target.loadVideoById(this.currentVideoId);
                   }
@@ -310,7 +324,14 @@ class YouTubeAudioService {
 
     try {
       if (this.player) {
-        if (typeof this.player.unMute === 'function') this.player.unMute();
+        if (this.isMuted) {
+          if (typeof this.player.mute === 'function') this.player.mute();
+        } else {
+          if (typeof this.player.unMute === 'function') this.player.unMute();
+          if (typeof this.player.setVolume === 'function') {
+            this.player.setVolume(Math.round(this.currentVolume * 100));
+          }
+        }
         this.player.loadVideoById({ videoId });
         if (typeof this.player.playVideo === 'function') this.player.playVideo();
       }
@@ -361,14 +382,16 @@ class YouTubeAudioService {
   }
 
   public setVolume(vol: number) {
+    this.currentVolume = Math.max(0, Math.min(1, vol));
     if (this.player && typeof this.player.setVolume === 'function') {
       try {
-        this.player.setVolume(Math.round(Math.max(0, Math.min(1, vol)) * 100));
+        this.player.setVolume(Math.round(this.currentVolume * 100));
       } catch (_) {}
     }
   }
 
   public mute() {
+    this.isMuted = true;
     if (this.player && typeof this.player.mute === 'function') {
       try {
         this.player.mute();
@@ -377,9 +400,13 @@ class YouTubeAudioService {
   }
 
   public unMute() {
+    this.isMuted = false;
     if (this.player && typeof this.player.unMute === 'function') {
       try {
         this.player.unMute();
+        if (typeof this.player.setVolume === 'function') {
+          this.player.setVolume(Math.round(this.currentVolume * 100));
+        }
       } catch (_) {}
     }
   }
@@ -416,6 +443,18 @@ class YouTubeAudioService {
 
   private handleStateChange(state: number) {
     // YT.PlayerState: UNSTARTED (-1), ENDED (0), PLAYING (1), PAUSED (2), BUFFERING (3), CUED (5)
+    if (state === 1 && this.player) {
+      try {
+        if (this.isMuted) {
+          if (typeof this.player.mute === 'function') this.player.mute();
+        } else {
+          if (typeof this.player.unMute === 'function') this.player.unMute();
+          if (typeof this.player.setVolume === 'function') {
+            this.player.setVolume(Math.round(this.currentVolume * 100));
+          }
+        }
+      } catch (_) {}
+    }
     switch (state) {
       case 1: // PLAYING
         this._isPlaying = true;

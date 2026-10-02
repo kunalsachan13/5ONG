@@ -1,5 +1,6 @@
 # Dependencies
 /node_modules
+/desktop/node_modules
 /.pnp
 .pnp.js
 
@@ -30,12 +31,15 @@ google_oauth_client.json
 
 # Build binaries & packages
 dist-desktop/
+dist-installer/
 dist-android/
+dist/
 android/app/build/
 android/build/
 android/local.properties
 android/.gradle/
 *.apk
+*.exe
 
 # TypeScript cache
 *.tsbuildinfo

@@ -20,7 +20,7 @@ export function toPublicUser(u: any): PublicUser {
   };
 }
 
-export async function createSession(userId: string | number, userMeta?: Partial<PublicUser>) {
+export async function createSession(userId: string | number, userMeta?: Partial<PublicUser>): Promise<string> {
   const token = await new SignJWT({
     uid: String(userId),
     user: userMeta ? { id: userId, ...userMeta } : undefined,
@@ -36,6 +36,7 @@ export async function createSession(userId: string | number, userMeta?: Partial<
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
+  return token;
 }
 
 export async function clearSession() {
