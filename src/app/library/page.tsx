@@ -41,7 +41,7 @@ function LibraryInner() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="w-full flex flex-col gap-6 transition-all duration-300">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-black">Your library</h1>
         {!user && (

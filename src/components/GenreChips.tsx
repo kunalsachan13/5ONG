@@ -7,7 +7,7 @@ import { useJson } from "@/lib/useJson";
 export default function GenreChips() {
   const { data } = useJson<{ genres: { id: string; name: string; picture: string }[] }>("/api/music/genres");
   return (
-    <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 md:-mx-8 md:px-8">
+    <div className="no-scrollbar flex w-full gap-3 overflow-x-auto pb-2 scroll-smooth">
       {(data?.genres ?? Array.from({ length: 8 }, () => null)).map((g, i) => (
         <Link
           key={g?.id ?? i}

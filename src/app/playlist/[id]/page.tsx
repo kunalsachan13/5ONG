@@ -34,13 +34,13 @@ export default function PlaylistPage({ params }: { params: Promise<{ id: string 
   if (state === "loading") return <div className="grid place-items-center py-24"><Spinner size={30} /></div>;
   if (state === "missing" || !data)
     return (
-      <div className="mx-auto max-w-6xl">
+      <div className="w-full transition-all duration-300">
         <EmptyState icon={<ListMusic />} title="Playlist not found">It may have been deleted, or you need to sign in.</EmptyState>
       </div>
     );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="w-full flex flex-col gap-6 transition-all duration-300">
       <div className="rounded-[2rem] bg-gradient-to-br from-peach via-pink to-lilac p-6 md:p-8">
         <p className="text-xs font-black uppercase tracking-wider text-ink/60">Playlist</p>
         {editing ? (

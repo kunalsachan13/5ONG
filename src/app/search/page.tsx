@@ -25,7 +25,7 @@ function SearchInner() {
 
   if (!url) {
     return (
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <div className="w-full flex flex-col gap-6 transition-all duration-300">
         <EmptyState icon={<Search />} title="Search 5ONG">
           Type in the search bar above — or press <kbd className="rounded bg-white px-1.5 font-black">/</kbd> anywhere.
         </EmptyState>
@@ -37,7 +37,7 @@ function SearchInner() {
 
   const tracks = data?.tracks ?? [];
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="w-full flex flex-col gap-6 transition-all duration-300">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black">
           {artist ? `Top tracks · ${name ?? "Artist"}` : `Results for “${q}”`}

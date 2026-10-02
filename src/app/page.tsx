@@ -33,8 +33,8 @@ export default function HomePage() {
   const tracks = data?.tracks ?? [];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-8 pb-6">
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach p-6 shadow-lg shadow-lilac-deep/20 md:p-10">
+    <div className="flex w-full flex-col gap-8 pb-6 transition-all duration-300">
+      <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach p-6 shadow-lg shadow-lilac-deep/20 transition-all duration-300 md:p-10">
         <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl" />
         <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/50 blur-2xl" />
         <div className="relative max-w-xl">
@@ -57,9 +57,9 @@ export default function HomePage() {
       </section>
 
       {recent.length > 0 && (
-        <section>
+        <section className="w-full">
           <h2 className="mb-3 text-xl font-black">Jump back in</h2>
-          <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:-mx-8 md:px-8">
+          <div className="no-scrollbar flex w-full gap-4 overflow-x-auto pb-2 scroll-smooth">
             {recent.map((t) => (
               <button key={t.id} className="group w-36 shrink-0 text-left" onClick={() => playList(recent, recent.indexOf(t))}>
                 <div className="relative">
@@ -76,15 +76,15 @@ export default function HomePage() {
         </section>
       )}
 
-      <section>
+      <section className="w-full">
         <h2 className="mb-3 text-xl font-black">Browse by genre</h2>
         <GenreChips />
       </section>
 
       {data?.artists && data.artists.length > 0 && (
-        <section>
+        <section className="w-full">
           <h2 className="mb-3 text-xl font-black">Popular artists</h2>
-          <div className="no-scrollbar -mx-4 flex gap-5 overflow-x-auto px-4 pb-2 md:-mx-8 md:px-8">
+          <div className="no-scrollbar flex w-full gap-5 overflow-x-auto pb-2 scroll-smooth">
             {data.artists.map((a) => (
               <Link key={a.id} href={`/search?artist=${a.id}&name=${encodeURIComponent(a.name)}`} className="group w-28 shrink-0 text-center">
                 <Cover src={a.picture} size={112} rounded="rounded-full" className="shadow-md transition group-hover:scale-105" />

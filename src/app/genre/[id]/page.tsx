@@ -19,7 +19,7 @@ export default function GenrePage({ params }: { params: Promise<{ id: string }> 
   const { id } = use(params);
   const { data, loading, error } = useJson<Charts>(`/api/music/charts?genre=${id}&limit=50`);
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="w-full flex flex-col gap-6 transition-all duration-300">
       <div className="rounded-[2rem] bg-gradient-to-br from-sky via-mint to-butter p-6 md:p-8">
         <p className="text-xs font-black uppercase tracking-wider text-ink/60">Genre charts</p>
         <h1 className="mb-4 text-3xl font-black md:text-4xl">{data?.name ?? "…"}</h1>
