@@ -37,7 +37,27 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        androidx.core.splashscreen.SplashScreen splashScreen = androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
+        splashScreen.setOnExitAnimationListener(new androidx.core.splashscreen.SplashScreen.OnExitAnimationListener() {
+            @Override
+            public void onSplashScreenExit(final androidx.core.splashscreen.SplashScreenViewProvider splashScreenViewProvider) {
+                android.view.View splashView = splashScreenViewProvider.getView();
+                splashView.animate()
+                    .alpha(0f)
+                    .scaleX(1.08f)
+                    .scaleY(1.08f)
+                    .setDuration(400)
+                    .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+                    .withEndAction(new Runnable() {
+                        @Override
+                        public void run() {
+                            splashScreenViewProvider.remove();
+                        }
+                    })
+                    .start();
+            }
+        });
         setupDownloader();
         handleDeepLink(getIntent());
     }

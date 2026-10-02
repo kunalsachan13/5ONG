@@ -35,6 +35,7 @@ import NowPlaying from "@/components/NowPlaying";
 import Logo from "@/components/Logo";
 import EditAvatarModal from "@/components/EditAvatarModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import AppSplashScreen from "@/components/AppSplashScreen";
 
 const NAV = [
   { href: "/", label: "Home", Icon: House },
@@ -591,6 +592,7 @@ export default function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
+      <AppSplashScreen />
       <Sidebar
         isExpanded={sidebarHovered}
         onMouseEnter={() => setSidebarHovered(true)}
