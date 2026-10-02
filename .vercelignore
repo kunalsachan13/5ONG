@@ -1,6 +1,8 @@
+dist-installer/
 dist-desktop/
 dist-android/
 android/
 desktop/
 node_modules/
 .git/
+.next/
