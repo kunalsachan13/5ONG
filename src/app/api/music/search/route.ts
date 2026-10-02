@@ -225,11 +225,38 @@ async function searchItunes(q: string, limit = 25): Promise<Track[]> {
   }
 }
 
+import { searchSpotify, getSpotifyPlaylist } from "@/lib/spotapi";
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") ?? "").trim();
   const artist = searchParams.get("artist");
-  if (!q && !artist) return Response.json({ tracks: [], playlists: [], artists: [] });
+  const sourceParam = (searchParams.get("source") || "all").toLowerCase();
+
+  if (!q && !artist) return Response.json({ tracks: [], playlists: [], artists: [], source: sourceParam });
+
+  // Check direct Spotify playlist URL or URI
+  const spPlaylistMatch = q.match(/open\.spotify\.com\/playlist\/([a-zA-Z0-9]+)/) || q.match(/spotify:playlist:([a-zA-Z0-9]+)/);
+  if (spPlaylistMatch) {
+    const plId = spPlaylistMatch[1];
+    const spPl = await getSpotifyPlaylist(plId).catch(() => null);
+    if (spPl) {
+      return Response.json({
+        tracks: spPl.tracks,
+        playlists: [
+          {
+            id: `spotify_${plId}`,
+            name: spPl.name,
+            count: spPl.totalCount || spPl.tracks.length,
+            covers: spPl.cover ? [spPl.cover] : [],
+            source: "Spotify",
+          },
+        ],
+        artists: [],
+        source: "spotify",
+      });
+    }
+  }
 
   try {
     if (artist && /^\d+$/.test(artist)) {
@@ -237,75 +264,120 @@ export async function GET(req: Request) {
         const top = await dz<{ data: unknown[] }>(`/artist/${artist}/top?limit=50`, 600);
         const tracks = normalizeTracks(top.data as never[]);
         if (tracks.length > 0) {
-          return Response.json({ tracks, playlists: [], artists: [] });
+          return Response.json({ tracks, playlists: [], artists: [], source: sourceParam });
         }
       } catch (_) {}
 
       const fallbackTracks = await searchItunes(q || artist, 40);
-      return Response.json({ tracks: fallbackTracks, playlists: [], artists: [] });
+      return Response.json({ tracks: fallbackTracks, playlists: [], artists: [], source: sourceParam });
     }
 
-    // Parallel multi-source search:
-    // 1. JioSaavn (Bollywood, Regional, 320k verified CDN)
-    // 2. Deezer (International, western catalog)
-    // 3. JioSaavn Playlists + Deezer Playlists
-    // 4. Artists
-    const [saavnTracks, dzRes, saavnPlaylists, dzPlaylists] = await Promise.all([
-      searchSaavnSongs(q, 30).catch(() => [] as Track[]),
-      Promise.all([
+    let allTracks: Track[] = [];
+    let playlists: PlaylistSummary[] = [];
+    let artists: { id: string; name: string; picture: string }[] = [];
+    let switchedFrom: string | null = null;
+
+    if (sourceParam === "spotify") {
+      // 1. Prioritize Spotify
+      const spData = await searchSpotify(q, 20).catch(() => ({ tracks: [], playlists: [] }));
+      allTracks = spData.tracks;
+      playlists = spData.playlists;
+
+      // If Spotify has no results or very few, switch to other sources
+      if (allTracks.length < 3 && playlists.length === 0) {
+        switchedFrom = "spotify";
+        const [saavnT, saavnP, dzP] = await Promise.all([
+          searchSaavnSongs(q, 25).catch(() => [] as Track[]),
+          searchSaavnPlaylists(q, 15).catch(() => [] as PlaylistSummary[]),
+          searchDeezerPlaylists(q, 12).catch(() => [] as PlaylistSummary[]),
+        ]);
+        allTracks = [...allTracks, ...saavnT];
+        playlists = [...playlists, ...saavnP, ...dzP];
+      }
+    } else if (sourceParam === "saavn") {
+      // 2. Prioritize JioSaavn
+      const [saavnT, saavnP] = await Promise.all([
+        searchSaavnSongs(q, 30).catch(() => [] as Track[]),
+        searchSaavnPlaylists(q, 18).catch(() => [] as PlaylistSummary[]),
+      ]);
+      allTracks = saavnT;
+      playlists = saavnP;
+
+      // If JioSaavn has no results, switch to Spotify and Deezer
+      if (allTracks.length < 3 && playlists.length === 0) {
+        switchedFrom = "saavn";
+        const spData = await searchSpotify(q, 15).catch(() => ({ tracks: [], playlists: [] }));
+        const dzP = await searchDeezerPlaylists(q, 12).catch(() => [] as PlaylistSummary[]);
+        allTracks = [...allTracks, ...spData.tracks];
+        playlists = [...playlists, ...spData.playlists, ...dzP];
+      }
+    } else if (sourceParam === "deezer") {
+      // 3. Prioritize Deezer
+      const [dzTracksRes, dzP] = await Promise.all([
         dz<{ data: unknown[] }>(`/search?q=${encodeURIComponent(q)}&limit=30`, 120).catch(() => ({ data: [] })),
-        dz<{ data: { id: number; name: string; picture_medium: string; nb_fan: number }[] }>(
-          `/search/artist?q=${encodeURIComponent(q)}&limit=8`,
-          120
-        ).catch(() => ({ data: [] })),
-      ]).catch(() => [{ data: [] }, { data: [] }]),
-      searchSaavnPlaylists(q, 15).catch(() => [] as PlaylistSummary[]),
-      searchDeezerPlaylists(q, 15).catch(() => [] as PlaylistSummary[]),
-    ]);
+        searchDeezerPlaylists(q, 15).catch(() => [] as PlaylistSummary[]),
+      ]);
+      allTracks = normalizeTracks((dzTracksRes.data as never[]) || []);
+      playlists = dzP;
 
-    const dzTracks = normalizeTracks((dzRes[0]?.data as never[]) || []);
-    const artists = ((dzRes[1]?.data as any[]) || []).map((a) => ({
-      id: String(a.id),
-      name: a.name,
-      picture: a.picture_medium,
-    }));
-
-    // Combine playlists
-    const playlists: PlaylistSummary[] = [...saavnPlaylists, ...dzPlaylists];
-
-    // Combine and deduplicate tracks
-    const allTracks: Track[] = [];
-    const seen = new Set<string>();
-
-    const normalizeKey = (t: Track) =>
-      `${t.title.toLowerCase().replace(/[^a-z0-9]/g, "")}_${t.artist.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10)}`;
-
-    // Prioritize JioSaavn tracks (full 320k audio streams + accurate metadata)
-    for (const t of saavnTracks) {
-      const key = normalizeKey(t);
-      if (!seen.has(key)) {
-        seen.add(key);
-        allTracks.push(t);
+      // If Deezer has no results, switch to Spotify and JioSaavn
+      if (allTracks.length < 3 && playlists.length === 0) {
+        switchedFrom = "deezer";
+        const [spData, saavnT, saavnP] = await Promise.all([
+          searchSpotify(q, 15).catch(() => ({ tracks: [] as Track[], playlists: [] as PlaylistSummary[] })),
+          searchSaavnSongs(q, 25).catch(() => [] as Track[]),
+          searchSaavnPlaylists(q, 12).catch(() => [] as PlaylistSummary[]),
+        ]);
+        allTracks = [...allTracks, ...spData.tracks, ...saavnT];
+        playlists = [...playlists, ...spData.playlists, ...saavnP];
       }
-    }
+    } else if (sourceParam === "youtube") {
+      // 4. Prioritize YouTube
+      allTracks = await searchYouTubeTracks(q, 20).catch(() => [] as Track[]);
 
-    // Append Deezer tracks
-    for (const t of dzTracks) {
-      const key = normalizeKey(t);
-      if (!seen.has(key)) {
-        seen.add(key);
-        allTracks.push(t);
+      // If YouTube has few results, switch to Spotify & JioSaavn
+      if (allTracks.length < 3) {
+        switchedFrom = "youtube";
+        const [spData, saavnT, saavnP] = await Promise.all([
+          searchSpotify(q, 15).catch(() => ({ tracks: [] as Track[], playlists: [] as PlaylistSummary[] })),
+          searchSaavnSongs(q, 20).catch(() => [] as Track[]),
+          searchSaavnPlaylists(q, 10).catch(() => [] as PlaylistSummary[]),
+        ]);
+        allTracks = [...allTracks, ...spData.tracks, ...saavnT];
+        playlists = [...playlists, ...spData.playlists, ...saavnP];
       }
-    }
-
-    // If total tracks are few (e.g. rare remix, unreleased song, indie track), search YouTube and iTunes
-    if (allTracks.length < 8 || /remix|slowed|reverb|mashup|unreleased|live|cover/i.test(q)) {
-      const [ytTracks, itunesTracks] = await Promise.all([
-        searchYouTubeTracks(q, 8).catch(() => [] as Track[]),
-        allTracks.length < 5 ? searchItunes(q, 15).catch(() => [] as Track[]) : Promise.resolve([] as Track[]),
+    } else {
+      // 4. "all" (Auto-Cascade & Combine everything from SpotAPI + JioSaavn + Deezer + YouTube)
+      const [spData, saavnTracks, dzRes, saavnPlaylists, dzPlaylists] = await Promise.all([
+        searchSpotify(q, 15).catch(() => ({ tracks: [] as Track[], playlists: [] as PlaylistSummary[] })),
+        searchSaavnSongs(q, 25).catch(() => [] as Track[]),
+        Promise.all([
+          dz<{ data: unknown[] }>(`/search?q=${encodeURIComponent(q)}&limit=25`, 120).catch(() => ({ data: [] })),
+          dz<{ data: { id: number; name: string; picture_medium: string; nb_fan: number }[] }>(
+            `/search/artist?q=${encodeURIComponent(q)}&limit=8`,
+            120
+          ).catch(() => ({ data: [] })),
+        ]).catch(() => [{ data: [] }, { data: [] }]),
+        searchSaavnPlaylists(q, 12).catch(() => [] as PlaylistSummary[]),
+        searchDeezerPlaylists(q, 10).catch(() => [] as PlaylistSummary[]),
       ]);
 
-      for (const t of ytTracks) {
+      const dzTracks = normalizeTracks((dzRes[0]?.data as never[]) || []);
+      artists = ((dzRes[1]?.data as any[]) || []).map((a) => ({
+        id: String(a.id),
+        name: a.name,
+        picture: a.picture_medium,
+      }));
+
+      // Combine playlists: Spotify + JioSaavn + Deezer
+      playlists = [...spData.playlists, ...saavnPlaylists, ...dzPlaylists];
+
+      // Combine tracks with deduplication (JioSaavn 320k first, then Spotify, then Deezer)
+      const seen = new Set<string>();
+      const normalizeKey = (t: Track) =>
+        `${t.title.toLowerCase().replace(/[^a-z0-9]/g, "")}_${t.artist.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10)}`;
+
+      for (const t of saavnTracks) {
         const key = normalizeKey(t);
         if (!seen.has(key)) {
           seen.add(key);
@@ -313,8 +385,40 @@ export async function GET(req: Request) {
         }
       }
 
-      for (const t of itunesTracks) {
+      for (const t of spData.tracks) {
         const key = normalizeKey(t);
+        if (!seen.has(key)) {
+          seen.add(key);
+          allTracks.push(t);
+        }
+      }
+
+      for (const t of dzTracks) {
+        const key = normalizeKey(t);
+        if (!seen.has(key)) {
+          seen.add(key);
+          allTracks.push(t);
+        }
+      }
+    }
+
+    // Universal Fallback: If still few tracks, search YouTube & iTunes
+    if (allTracks.length < 8 || /remix|slowed|reverb|mashup|unreleased|live|cover/i.test(q)) {
+      const [ytTracks, itunesTracks] = await Promise.all([
+        searchYouTubeTracks(q, 10).catch(() => [] as Track[]),
+        allTracks.length < 5 ? searchItunes(q, 15).catch(() => [] as Track[]) : Promise.resolve([] as Track[]),
+      ]);
+
+      const seen = new Set(allTracks.map((t) => `${t.title.toLowerCase().replace(/[^a-z0-9]/g, "")}`));
+      for (const t of ytTracks) {
+        const key = t.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (!seen.has(key)) {
+          seen.add(key);
+          allTracks.push(t);
+        }
+      }
+      for (const t of itunesTracks) {
+        const key = t.title.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (!seen.has(key)) {
           seen.add(key);
           allTracks.push(t);
@@ -326,9 +430,11 @@ export async function GET(req: Request) {
       tracks: allTracks,
       playlists,
       artists,
+      source: sourceParam,
+      switchedFrom,
     });
   } catch (err: any) {
     const fallbackTracks = await searchItunes(q, 30);
-    return Response.json({ tracks: fallbackTracks, playlists: [], artists: [] });
+    return Response.json({ tracks: fallbackTracks, playlists: [], artists: [], source: sourceParam });
   }
 }

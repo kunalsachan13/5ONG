@@ -1,6 +1,7 @@
 import { firebaseDb } from "@/lib/firebaseDb";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth";
 import { normalizeTracks } from "@/lib/deezer";
+import { getSpotifyPlaylist } from "@/lib/spotapi";
 import type { Track } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,26 @@ function decodeHtml(html: string = ""): string {
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
+
+    // 0. Spotify catalog playlist
+    if (id.startsWith("spotify_") || id.startsWith("sp_")) {
+      const cleanId = id.replace("spotify_", "").replace("sp_", "");
+      try {
+        const spPl = await getSpotifyPlaylist(cleanId);
+        if (spPl && spPl.tracks.length > 0) {
+          return Response.json({
+            playlist: {
+              id,
+              name: spPl.name,
+              cover: spPl.cover,
+              isPublic: true,
+              source: "Spotify",
+            },
+            tracks: spPl.tracks,
+          });
+        }
+      } catch (_) {}
+    }
 
     // 1. JioSaavn catalog playlist
     if (id.startsWith("saavn_")) {
@@ -116,11 +137,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   }
 }
 
+function isCatalogPlaylist(id: string): boolean {
+  return id.startsWith("saavn_") || id.startsWith("dz_") || id.startsWith("spotify_") || id.startsWith("sp_");
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const u = await requireUser();
     const { id } = await ctx.params;
-    if (id.startsWith("saavn_") || id.startsWith("dz_")) {
+    if (isCatalogPlaylist(id)) {
       throw new HttpError(403, "Cannot edit a catalog playlist");
     }
     const body = await req.json().catch(() => ({}));
@@ -139,7 +164,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   try {
     const u = await requireUser();
     const { id } = await ctx.params;
-    if (id.startsWith("saavn_") || id.startsWith("dz_")) {
+    if (isCatalogPlaylist(id)) {
       throw new HttpError(403, "Cannot delete a catalog playlist");
     }
     await firebaseDb.deletePlaylist(u.id, id);
@@ -154,7 +179,7 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
   try {
     const u = await requireUser();
     const { id } = await ctx.params;
-    if (id.startsWith("saavn_") || id.startsWith("dz_")) {
+    if (isCatalogPlaylist(id)) {
       throw new HttpError(403, "Cannot modify a catalog playlist directly. Clone it to your library first.");
     }
     const body = await req.json().catch(() => ({}));
@@ -172,7 +197,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     const u = await requireUser();
     const { id } = await ctx.params;
-    if (id.startsWith("saavn_") || id.startsWith("dz_")) {
+    if (isCatalogPlaylist(id)) {
       throw new HttpError(403, "Cannot modify a catalog playlist");
     }
     const body = await req.json().catch(() => ({}));

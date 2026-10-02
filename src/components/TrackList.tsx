@@ -217,6 +217,23 @@ export function TrackRow({
           {track.explicit && (
             <span className="ml-1.5 rounded bg-ink/10 dark:bg-white/15 px-1 py-px align-middle text-[9px] font-black text-muted">E</span>
           )}
+          {track.source && (
+            <span
+              className={`ml-1.5 rounded px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wider ${
+                track.source === "spotify"
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  : track.source === "saavn"
+                  ? "bg-teal-500/15 text-teal-600 dark:text-teal-400"
+                  : track.source === "deezer"
+                  ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                  : track.source === "youtube"
+                  ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                  : "bg-ink/5 dark:bg-white/10 text-muted"
+              }`}
+            >
+              {track.source === "saavn" ? "Saavn" : track.source}
+            </span>
+          )}
         </p>
         <p className="truncate text-xs text-muted">
           {track.artist}

@@ -15,7 +15,11 @@ interface Result {
   tracks: Track[];
   playlists?: PlaylistSummary[];
   artists: { id: string; name: string; picture: string }[];
+  source?: string;
+  switchedFrom?: string | null;
 }
+
+type SourceType = "all" | "spotify" | "saavn" | "deezer" | "youtube";
 
 function SearchInner() {
   const sp = useSearchParams();
@@ -23,11 +27,12 @@ function SearchInner() {
   const artist = sp.get("artist");
   const name = sp.get("name");
   const [activeTab, setActiveTab] = useState<"all" | "songs" | "playlists" | "artists">("all");
+  const [source, setSource] = useState<SourceType>("all");
 
   const url = artist
     ? `/api/music/search?artist=${encodeURIComponent(artist)}`
     : q
-    ? `/api/music/search?q=${encodeURIComponent(q)}`
+    ? `/api/music/search?q=${encodeURIComponent(q)}&source=${source}`
     : null;
   const { data, loading, error } = useJson<Result>(url);
 
@@ -45,7 +50,7 @@ function SearchInner() {
               Find any song, playlist or artist.
             </h1>
             <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-white/80 md:text-base">
-              Search millions of Bollywood, Punjabi, Regional, Western & unreleased songs, plus full playlists!
+              Search millions of songs & playlists from Spotify, JioSaavn, Deezer and YouTube with smart source switching!
             </p>
           </div>
         </section>
@@ -63,21 +68,99 @@ function SearchInner() {
   return (
     <div className="w-full flex flex-col gap-6 transition-all duration-300">
       {/* Search Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black md:text-3xl text-ink dark:text-white">
-            {artist ? `Top tracks · ${name ?? "Artist"}` : `Results for “${q}”`}
-          </h1>
-          {!loading && hasResults && (
-            <p className="mt-0.5 text-xs font-semibold text-muted">
-              {tracks.length} song{tracks.length === 1 ? "" : "s"}
-              {playlists.length > 0 && ` · ${playlists.length} playlist${playlists.length === 1 ? "" : "s"}`}
-              {artists.length > 0 && ` · ${artists.length} artist${artists.length === 1 ? "" : "s"}`}
-            </p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-black md:text-3xl text-ink dark:text-white">
+              {artist ? `Top tracks · ${name ?? "Artist"}` : `Results for “${q}”`}
+            </h1>
+            {!loading && hasResults && (
+              <p className="mt-0.5 text-xs font-semibold text-muted">
+                {tracks.length} song{tracks.length === 1 ? "" : "s"}
+                {playlists.length > 0 && ` · ${playlists.length} playlist${playlists.length === 1 ? "" : "s"}`}
+                {artists.length > 0 && ` · ${artists.length} artist${artists.length === 1 ? "" : "s"}`}
+              </p>
+            )}
+          </div>
+          {tracks.length > 0 && (activeTab === "all" || activeTab === "songs") && (
+            <PlayAllButtons tracks={tracks} />
           )}
         </div>
-        {tracks.length > 0 && (activeTab === "all" || activeTab === "songs") && (
-          <PlayAllButtons tracks={tracks} />
+
+        {/* Source Switcher */}
+        {!artist && (
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 w-fit">
+            <button
+              type="button"
+              onClick={() => setSource("all")}
+              className={`px-3 py-1 text-xs font-bold rounded-xl transition-all ${
+                source === "all"
+                  ? "bg-lilac-deep text-white shadow-xs"
+                  : "text-muted hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              🌐 All Sources
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("spotify")}
+              className={`px-3 py-1 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                source === "spotify"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-muted hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block" />
+              Spotify
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("saavn")}
+              className={`px-3 py-1 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                source === "saavn"
+                  ? "bg-teal-600 text-white shadow-xs"
+                  : "text-muted hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-teal-300 inline-block" />
+              JioSaavn
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("deezer")}
+              className={`px-3 py-1 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                source === "deezer"
+                  ? "bg-purple-600 text-white shadow-xs"
+                  : "text-muted hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-purple-300 inline-block" />
+              Deezer
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("youtube")}
+              className={`px-3 py-1 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                source === "youtube"
+                  ? "bg-red-600 text-white shadow-xs"
+                  : "text-muted hover:text-ink dark:hover:text-white"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-red-400 inline-block" />
+              YouTube
+            </button>
+          </div>
+        )}
+
+        {/* Auto-Switch Fallback Alert */}
+        {!loading && data?.switchedFrom && (
+          <div className="flex items-center gap-2.5 p-3 px-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-semibold">
+            <span className="text-base">⚡</span>
+            <span>
+              Few or no results found on <strong className="capitalize font-black">{data.switchedFrom}</strong>.
+              Automatically switched to other sources so you get the best matching songs & playlists!
+            </span>
+          </div>
         )}
       </div>
 
@@ -137,7 +220,7 @@ function SearchInner() {
 
       {!loading && !error && !hasResults && (
         <EmptyState icon={<Search />} title="No results found">
-          Try searching with a song title, singer name, or playlist mood.
+          Try searching with a song title, singer name, or playlist mood across different sources.
         </EmptyState>
       )}
 
