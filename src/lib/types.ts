@@ -25,10 +25,11 @@ export interface PublicUser {
 }
 
 export interface PlaylistSummary {
-  id: number;
+  id: number | string;
   name: string;
   count: number;
   covers: string[];
+  source?: string;
 }
 
 export interface LyricLine {

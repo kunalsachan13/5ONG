@@ -23,7 +23,7 @@ interface AppCtx {
   refreshLibrary: () => Promise<void>;
   toggleLike: (t: Track) => Promise<void>;
   createPlaylist: (name: string, tracks?: Track[]) => Promise<PlaylistSummary | null>;
-  addToPlaylist: (playlistId: number, tracks: Track[]) => Promise<void>;
+  addToPlaylist: (playlistId: number | string, tracks: Track[]) => Promise<void>;
   logPlay: (t: Track, seconds: number) => void;
   toast: (msg: string, kind?: "ok" | "err") => void;
   toasts: { id: number; msg: string; kind: "ok" | "err" }[];
@@ -199,8 +199,8 @@ export default function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const addToPlaylist = useCallback(
-    async (playlistId: number, tracks: Track[]) => {
-      if (playlistId < 0 || !user) {
+    async (playlistId: number | string, tracks: Track[]) => {
+      if ((typeof playlistId === "number" && playlistId < 0) || !user) {
         setPlaylists((prev) =>
           prev.map((pl) => {
             if (pl.id === playlistId) {
