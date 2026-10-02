@@ -337,7 +337,7 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
 
   if (!p.roomCode) {
     return (
-      <div className="mx-auto grid w-full max-w-3xl gap-4 md:grid-cols-2">
+      <div className="grid w-full gap-4 transition-all duration-300 md:grid-cols-2">
         <div className="card flex flex-col gap-3 p-6">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-lilac to-pink">
             <Crown size={22} />
@@ -388,7 +388,7 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
 
   const room = p.room;
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+    <div className="flex w-full flex-col gap-4 transition-all duration-300">
       <div className="card flex flex-col items-center gap-3 p-6 text-center">
         <span className="flex items-center gap-2 rounded-full bg-mint px-3 py-1 text-xs font-black">
           <span className="relative flex h-2 w-2">

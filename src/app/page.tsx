@@ -34,9 +34,9 @@ export default function HomePage() {
 
   return (
     <div className="flex w-full flex-col gap-8 pb-6 transition-all duration-300">
-      <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach p-6 shadow-lg shadow-lilac-deep/20 transition-all duration-300 md:p-10">
-        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl" />
-        <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/50 blur-2xl" />
+      <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach p-6 shadow-lg shadow-lilac-deep/15 transition-all duration-300 md:p-8">
+        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/50 blur-2xl pointer-events-none" />
         <div className="relative max-w-xl">
           <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1 text-xs font-black">
             <Sparkles size={13} /> {user ? `Welcome back, ${user.username}` : "Welcome to 5ONG"}

@@ -46,28 +46,35 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6">
-      <div className="rounded-[2rem] bg-gradient-to-br from-mint via-sky to-lilac p-6 md:p-8">
-        <h1 className="flex items-center gap-2 text-3xl font-black">
-          <Link2 /> Import from Spotify
-        </h1>
-        <p className="mb-4 mt-1 max-w-xl text-sm font-semibold text-ink/70">
-          Paste a public Spotify playlist or album link. We read the track list instantly and match every song to playable audio.
-        </p>
-        <form className="flex flex-col gap-2 sm:flex-row" onSubmit={run}>
-          <input
-            className="input"
-            placeholder="https://open.spotify.com/playlist/…"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            aria-label="Spotify link"
-            required
-          />
-          <button className="btn btn-primary shrink-0 !bg-ink !text-white" disabled={busy || !url.trim()}>
-            {busy ? <Spinner size={16} /> : <Link2 size={16} />} {busy ? "Matching tracks…" : "Import"}
-          </button>
-        </form>
-      </div>
+    <div className="flex w-full flex-col gap-6 transition-all duration-300">
+      <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-mint via-sky to-lilac p-6 shadow-lg shadow-lilac-deep/15 transition-all duration-300 md:p-8">
+        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-pink/40 blur-2xl pointer-events-none" />
+        <div className="relative max-w-xl">
+          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1 text-xs font-black text-ink">
+            <Link2 size={13} /> Playlist converter
+          </p>
+          <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink">
+            Import from Spotify
+          </h1>
+          <p className="mb-4 mt-2 text-sm font-semibold text-ink/75 md:text-base">
+            Paste a public Spotify playlist or album link. We match every track instantly to high quality audio.
+          </p>
+          <form className="flex flex-col gap-2 sm:flex-row max-w-xl" onSubmit={run}>
+            <input
+              className="input !rounded-2xl"
+              placeholder="https://open.spotify.com/playlist/…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              aria-label="Spotify link"
+              required
+            />
+            <button className="btn btn-primary shrink-0 !bg-ink !text-white" disabled={busy || !url.trim()}>
+              {busy ? <Spinner size={16} /> : <Link2 size={16} />} {busy ? "Matching tracks…" : "Import"}
+            </button>
+          </form>
+        </div>
+      </section>
 
       {error && (
         <p className="card flex items-center gap-2 p-4 text-sm font-bold text-pink-deep">

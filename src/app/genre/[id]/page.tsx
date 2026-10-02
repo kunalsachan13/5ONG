@@ -20,7 +20,9 @@ export default function GenrePage({ params }: { params: Promise<{ id: string }> 
   const { data, loading, error } = useJson<Charts>(`/api/music/charts?genre=${id}&limit=50`);
   return (
     <div className="w-full flex flex-col gap-6 transition-all duration-300">
-      <div className="rounded-[2rem] bg-gradient-to-br from-sky via-mint to-butter p-6 md:p-8">
+      <div className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-sky via-mint to-butter p-6 shadow-lg shadow-lilac-deep/15 transition-all duration-300 md:p-8">
+        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-pink/40 blur-2xl pointer-events-none" />
         <p className="text-xs font-black uppercase tracking-wider text-ink/60">Genre charts</p>
         <h1 className="mb-4 text-3xl font-black md:text-4xl">{data?.name ?? "…"}</h1>
         <PlayAllButtons tracks={data?.tracks ?? []} />

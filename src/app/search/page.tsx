@@ -25,10 +25,22 @@ function SearchInner() {
 
   if (!url) {
     return (
-      <div className="w-full flex flex-col gap-6 transition-all duration-300">
-        <EmptyState icon={<Search />} title="Search 5ONG">
-          Type in the search bar above — or press <kbd className="rounded bg-white px-1.5 font-black">/</kbd> anywhere.
-        </EmptyState>
+      <div className="flex w-full flex-col gap-6 transition-all duration-300">
+        <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-lilac via-pink to-peach p-6 shadow-lg shadow-lilac-deep/15 transition-all duration-300 md:p-8">
+          <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/40 blur-2xl pointer-events-none" />
+          <div className="relative max-w-xl">
+            <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1 text-xs font-black text-ink">
+              <Search size={13} /> Explore catalog
+            </p>
+            <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink">
+              Find any song, artist or album.
+            </h1>
+            <p className="mt-2 text-sm font-semibold text-ink/75 md:text-base">
+              Use the search bar above — or press <kbd className="rounded bg-white/80 px-1.5 py-0.5 font-black text-ink shadow-xs">/</kbd> anywhere to start typing.
+            </p>
+          </div>
+        </section>
         <h2 className="text-xl font-black">Browse genres</h2>
         <GenreChips />
       </div>
