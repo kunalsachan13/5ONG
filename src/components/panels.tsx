@@ -312,7 +312,12 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [chatDraft, setChatDraft] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const tried = useRef(false);
+
+  const room = p.room;
 
   useEffect(() => {
     if (initialCode && user && !p.roomCode && !tried.current) {
@@ -321,8 +326,15 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
     }
   }, [initialCode, user, p]);
 
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [room?.messages?.length]);
+
   const copy = async (what: "code" | "link") => {
-    const text = what === "code" ? p.roomCode! : `${window.location.origin}/rooms?code=${p.roomCode}`;
+    if (!p.roomCode) return;
+    const text = what === "code" ? p.roomCode : `${window.location.origin}/rooms?code=${p.roomCode}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(what);
@@ -331,6 +343,48 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
       /* ignore */
     }
   };
+
+  async function handleSendChat(e: React.FormEvent) {
+    e.preventDefault();
+    const text = chatDraft.trim();
+    if (!text || !p.roomCode || sendingChat) return;
+    setChatDraft("");
+    setSendingChat(true);
+
+    // Optimistically show message
+    if (user && p.room) {
+      const optimisticMsg = {
+        id: `opt-${Date.now()}`,
+        userId: user.id,
+        userName: user.username,
+        userAvatar: user.avatarUrl || null,
+        text,
+        timestamp: Date.now(),
+      };
+      p.setRoom({
+        ...p.room,
+        messages: [...(p.room.messages || []), optimisticMsg],
+      });
+    }
+
+    try {
+      const res = await fetch(`/api/rooms/${p.roomCode}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (p.room && data.messages) {
+          p.setRoom({ ...p.room, messages: data.messages });
+        }
+      }
+    } catch {
+      // transient
+    } finally {
+      setSendingChat(false);
+    }
+  }
 
   if (!user) {
     return (
@@ -391,57 +445,13 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
     );
   }
 
-  const room = p.room;
-  const [chatDraft, setChatDraft] = useState("");
-  const [sendingChat, setSendingChat] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [room?.messages?.length]);
-
-  async function handleSendChat(e: React.FormEvent) {
-    e.preventDefault();
-    const text = chatDraft.trim();
-    if (!text || !p.roomCode || sendingChat) return;
-    setChatDraft("");
-    setSendingChat(true);
-
-    // Optimistically show message
-    if (user && p.room) {
-      const optimisticMsg = {
-        id: `opt-${Date.now()}`,
-        userId: user.id,
-        userName: user.username,
-        userAvatar: user.avatarUrl || null,
-        text,
-        timestamp: Date.now(),
-      };
-      p.setRoom({
-        ...p.room,
-        messages: [...(p.room.messages || []), optimisticMsg],
-      });
-    }
-
-    try {
-      const res = await fetch(`/api/rooms/${p.roomCode}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (p.room && data.messages) {
-          p.setRoom({ ...p.room, messages: data.messages });
-        }
-      }
-    } catch {
-      // transient
-    } finally {
-      setSendingChat(false);
-    }
+  if (!room) {
+    return (
+      <div className="card flex flex-col items-center justify-center gap-3 p-12 text-center">
+        <Spinner size={32} />
+        <p className="text-sm font-bold text-muted">Connecting to room {p.roomCode}…</p>
+      </div>
+    );
   }
 
   return (
@@ -479,28 +489,30 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
           <Users size={16} /> Listening now ({room?.members.length ?? 1})
         </h4>
         <div className="flex flex-wrap gap-2.5">
-          {(room?.members ?? []).map((m) => {
-            const isMe = user && String(user.id) === String(m.userId);
-            const isHost = m.userId === room?.hostId;
+          {(room?.members ?? []).map((m, idx) => {
+            const isMe = user && String(user.id) === String(m?.userId);
+            const isHost = m?.userId === room?.hostId;
+            const displayName = m?.name || (isMe ? (user.username || "You") : "Guest");
+            const initial = (displayName[0] || "U").toUpperCase();
             return (
               <span
-                key={m.userId}
+                key={m?.userId ?? idx}
                 className="flex items-center gap-2 rounded-full bg-white dark:bg-white/10 pl-1.5 pr-3 py-1 text-sm font-bold shadow-xs text-ink dark:text-white border border-ink/5 dark:border-white/10"
               >
-                {m.avatarUrl ? (
+                {m?.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={m.avatarUrl}
-                    alt={m.name}
+                    alt={displayName}
                     className="h-7 w-7 rounded-full object-cover ring-2 ring-lilac-deep/30"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
                   <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-xs font-black text-white">
-                    {m.name[0]?.toUpperCase()}
+                    {initial}
                   </span>
                 )}
-                <span className="truncate max-w-[120px]">{m.name}</span>
+                <span className="truncate max-w-[120px]">{displayName}</span>
                 {isHost && (
                   <span title="Host">
                     <Crown size={13} className="text-amber-500 fill-current shrink-0" />
@@ -549,40 +561,51 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
               <p className="text-[11px]">Chat with everyone in the room! Messages are private & temporary.</p>
             </div>
           ) : (
-            room.messages.map((msg) => {
-              const isMe = user && String(user.id) === String(msg.userId);
-              const isMsgHost = msg.userId === room.hostId;
-              const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            (room?.messages ?? []).map((msg, idx) => {
+              const isMe = user && String(user.id) === String(msg?.userId);
+              const isMsgHost = msg?.userId === room.hostId;
+              const senderName = msg?.userName || (isMe ? (user?.username || "You") : "Guest");
+              const initial = (senderName[0] || "U").toUpperCase();
+              let time = "";
+              try {
+                if (msg?.timestamp) {
+                  time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                }
+              } catch {}
               return (
                 <div
-                  key={msg.id}
+                  key={msg?.id ?? idx}
                   className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : "flex-row"}`}
                 >
-                  {msg.userAvatar ? (
+                  {msg?.userAvatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={msg.userAvatar}
-                      alt={msg.userName}
+                      alt={senderName}
                       className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20 mt-0.5"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-[11px] font-black text-white mt-0.5">
-                      {msg.userName[0]?.toUpperCase()}
+                      {initial}
                     </span>
                   )}
                   <div className={`flex flex-col max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
                     <div className="flex items-center gap-1.5 mb-0.5 text-[11px] text-muted">
                       <span className="font-extrabold text-ink dark:text-white/90">
-                        {isMe ? "You" : msg.userName}
+                        {isMe ? "You" : senderName}
                       </span>
                       {isMsgHost && (
                         <span title="Host">
                           <Crown size={11} className="text-amber-500 fill-current" />
                         </span>
                       )}
-                      <span>·</span>
-                      <span className="text-[10px]">{time}</span>
+                      {time && (
+                        <>
+                          <span>·</span>
+                          <span className="text-[10px]">{time}</span>
+                        </>
+                      )}
                     </div>
                     <div
                       className={`rounded-2xl px-3.5 py-2 text-sm font-semibold break-words leading-relaxed ${

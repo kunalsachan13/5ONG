@@ -48,6 +48,9 @@ next-env.d.ts
 # OS files
 .DS_Store
 Thumbs.db
+
+# Scratch temporary testing scripts
+/scratch/
 .neon
 .agents/mcp_config.json
 
