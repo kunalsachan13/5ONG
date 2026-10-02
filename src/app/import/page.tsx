@@ -54,10 +54,10 @@ export default function ImportPage() {
           <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 dark:bg-white/10 dark:text-mint px-3 py-1 text-xs font-black text-ink">
             <Link2 size={13} /> Playlist converter
           </p>
-          <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink">
+          <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink dark:text-white">
             Import from Spotify
           </h1>
-          <p className="mb-4 mt-2 text-sm font-semibold text-ink/75 dark:text-ink/80 md:text-base">
+          <p className="mb-4 mt-2 text-sm font-semibold text-ink/75 dark:text-white/80 md:text-base">
             Paste a public Spotify playlist or album link. We match every track instantly to high quality audio.
           </p>
           <form className="flex flex-col gap-2 sm:flex-row max-w-xl" onSubmit={run}>

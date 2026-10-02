@@ -42,7 +42,7 @@ export default function HomePage() {
           <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 dark:bg-white/10 dark:text-lilac-deep px-3 py-1 text-xs font-black">
             <Sparkles size={13} /> {user ? `Welcome back, ${user.username}` : "Welcome to 5ONG"}
           </p>
-          <h1 className="text-3xl font-black leading-tight md:text-5xl text-ink">Music that moves with you.</h1>
+          <h1 className="text-3xl font-black leading-tight md:text-5xl text-ink dark:text-white">Music that moves with you.</h1>
           <div className="mt-5 flex flex-wrap gap-2">
             <button
               className="btn bg-ink text-white dark:bg-white dark:!text-[#0c0918] shadow-lg hover:scale-105"

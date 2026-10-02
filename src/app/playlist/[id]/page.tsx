@@ -44,7 +44,7 @@ export default function PlaylistPage({ params }: { params: Promise<{ id: string 
       <div className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-peach via-pink to-lilac dark:from-[#3a202d] dark:via-[#3b1c3c] dark:to-[#2e1d4d] p-6 shadow-lg shadow-lilac-deep/15 dark:shadow-black/40 border border-transparent dark:border-white/10 transition-all duration-300 md:p-8">
         <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 dark:bg-pink-deep/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-sky/40 dark:bg-lilac-deep/15 blur-2xl pointer-events-none" />
-        <p className="text-xs font-black uppercase tracking-wider text-ink/60 dark:text-ink/75">Playlist</p>
+        <p className="text-xs font-black uppercase tracking-wider text-ink/60 dark:text-white/70">Playlist</p>
         {editing ? (
           <form
             className="my-2 flex gap-2"
@@ -66,9 +66,9 @@ export default function PlaylistPage({ params }: { params: Promise<{ id: string 
             <button className="btn btn-primary" aria-label="Save name"><Check size={16} /></button>
           </form>
         ) : (
-          <h1 className="my-1 text-3xl font-black md:text-4xl text-ink">{data.name}</h1>
+          <h1 className="my-1 text-3xl font-black md:text-4xl text-ink dark:text-white">{data.name}</h1>
         )}
-        <p className="mb-4 text-sm font-semibold text-ink/60 dark:text-ink/75">{data.tracks.length} tracks</p>
+        <p className="mb-4 text-sm font-semibold text-ink/60 dark:text-white/70">{data.tracks.length} tracks</p>
         <div className="flex flex-wrap items-center gap-2">
           <PlayAllButtons tracks={data.tracks} />
           <button className="btn btn-soft" onClick={() => setEditing((e) => !e)}>

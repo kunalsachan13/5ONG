@@ -34,11 +34,11 @@ function SearchInner() {
             <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 dark:bg-white/10 dark:text-lilac-deep px-3 py-1 text-xs font-black text-ink">
               <Search size={13} /> Explore catalog
             </p>
-            <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink">
+            <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink dark:text-white">
               Find any song, artist or album.
             </h1>
-            <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-ink/80 md:text-base">
-              Use the search bar above — or press <kbd className="rounded bg-white/80 dark:bg-white/10 px-1.5 py-0.5 font-black text-ink shadow-xs">/</kbd> anywhere to start typing.
+            <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-white/80 md:text-base">
+              Use the search bar above — or press <kbd className="rounded bg-white/80 dark:bg-white/10 px-1.5 py-0.5 font-black text-ink dark:text-white shadow-xs">/</kbd> anywhere to start typing.
             </p>
           </div>
         </section>

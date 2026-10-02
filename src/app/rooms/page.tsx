@@ -16,10 +16,10 @@ function RoomsInner() {
           <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 dark:bg-white/10 dark:text-butter px-3 py-1 text-xs font-black text-ink">
             <Users size={13} /> Synchronized listening
           </p>
-          <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink">
+          <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink dark:text-white">
             Listening rooms
           </h1>
-          <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-ink/80 md:text-base">
+          <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-white/80 md:text-base">
             Host a room, share the invite code, and listen in perfect sync. The host drives the music — everyone else enjoys.
           </p>
         </div>
