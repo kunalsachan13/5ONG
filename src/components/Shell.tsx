@@ -521,7 +521,7 @@ function InstallButton() {
   if (!evt) return null;
   return (
     <button
-      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-mint to-sky px-3.5 py-2 font-extrabold text-ink"
+      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-mint to-sky dark:from-[#2e1d4d] dark:to-[#1e2a4d] px-3.5 py-2 font-extrabold text-ink dark:text-white border border-transparent dark:border-white/10 shadow-xs"
       onClick={async () => {
         await evt.prompt();
         setEvt(null);

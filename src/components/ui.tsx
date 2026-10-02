@@ -93,7 +93,7 @@ export function Spinner({ size = 18 }: { size?: number }) {
 export function EmptyState({ icon, title, children }: { icon: React.ReactNode; title: string; children?: React.ReactNode }) {
   return (
     <div className="card mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-10 text-center">
-      <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-lilac/60 to-pink/60 text-ink">
+      <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-lilac/50 to-pink/50 dark:from-purple-500/20 dark:to-pink-500/20 text-lilac-deep dark:text-purple-300 border border-lilac/20 dark:border-purple-400/20 shadow-sm">
         {icon}
       </div>
       <h3 className="text-lg font-extrabold">{title}</h3>

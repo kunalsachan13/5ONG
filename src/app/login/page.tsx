@@ -161,7 +161,7 @@ function LoginInner() {
       <div className="text-center">
         <SongLogoIcon size={68} className="mx-auto mb-3" />
         <h1 className="text-3xl font-black">
-          Sign in to <span className="tracking-[0.14em] bg-gradient-to-r from-[#3a3059] via-[#6d579f] to-[#aa83e6] bg-clip-text text-transparent" style={{ fontFamily: "'Outfit', 'Space Grotesk', sans-serif" }}>5ONG</span>
+          Sign in to <span className="tracking-[0.16em] bg-gradient-to-r from-[#2c224b] via-[#6542a8] to-[#9861f4] dark:from-white dark:via-[#e2d5fc] dark:to-[#c084fc] bg-clip-text text-transparent drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(192,132,252,0.5)]" style={{ fontFamily: "'Outfit', 'Space Grotesk', sans-serif" }}>5ONG</span>
         </h1>
         <p className="text-sm text-muted">Save playlists, liked songs and enjoy personalized music.</p>
       </div>

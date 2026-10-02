@@ -70,17 +70,17 @@ export default function PlayerBar() {
             <p className="flex items-center gap-1.5 truncate text-xs text-muted">
               <span className="truncate">{t ? t.artist : "Pick a song to start"}</span>
               {p.sourceType === "saavn" && (
-                <span className="shrink-0 rounded-full bg-lilac/30 px-1.5 py-0.2 text-[9px] font-black text-lilac-deep">
+                <span className="shrink-0 rounded-full bg-lilac/30 dark:bg-purple-500/25 px-1.5 py-0.2 text-[9px] font-black text-lilac-deep dark:text-purple-300">
                   320k HD
                 </span>
               )}
               {p.sourceType === "youtube" && (
-                <span className="shrink-0 rounded-full bg-pink/30 px-1.5 py-0.2 text-[9px] font-black text-pink-deep">
+                <span className="shrink-0 rounded-full bg-pink/30 dark:bg-pink-500/25 px-1.5 py-0.2 text-[9px] font-black text-pink-deep dark:text-pink-300">
                   FULL
                 </span>
               )}
               {p.roomCode && (
-                <span className="shrink-0 rounded-full bg-mint px-1.5 py-0.5 text-[10px] font-black text-ink">
+                <span className="shrink-0 rounded-full bg-mint dark:bg-emerald-400 px-1.5 py-0.5 text-[10px] font-black text-ink dark:text-[#0c0918]">
                   LIVE {p.roomCode}
                 </span>
               )}
@@ -113,7 +113,7 @@ export default function PlayerBar() {
               <SkipBack size={20} fill="currentColor" />
             </button>
             <button
-              className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-ink shadow-lg shadow-lilac-deep/30 transition hover:scale-105 active:scale-95 disabled:opacity-50"
+              className="grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink dark:from-[#a855f7] dark:to-[#ec4899] text-ink dark:text-white shadow-lg shadow-lilac-deep/30 dark:shadow-purple-500/40 transition hover:scale-105 active:scale-95 disabled:opacity-50"
               aria-label={p.playing ? "Pause" : "Play"}
               onClick={p.toggle}
               disabled={!t}

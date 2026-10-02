@@ -37,17 +37,17 @@ body {
 
 /* Dark Mode Tokens & Overrides (High Visibility & Pristine Contrast) */
 html.dark {
-  --color-ink: #f2eefa;
-  --color-muted: #a79fc7;
+  --color-ink: #f8f6fd;
+  --color-muted: #b4abd2;
   --color-cream: #0c0918;
-  --color-lilac: #443270;
-  --color-lilac-deep: #b096f5;
-  --color-pink: #682649;
-  --color-pink-deep: #fa8bc0;
-  --color-peach: #5a3522;
-  --color-mint: #1a4d3d;
-  --color-sky: #1e3e65;
-  --color-butter: #5c4e1e;
+  --color-lilac: #c4b5fd;
+  --color-lilac-deep: #a855f7;
+  --color-pink: #fbcfe8;
+  --color-pink-deep: #f472b6;
+  --color-peach: #fed7aa;
+  --color-mint: #6ee7b7;
+  --color-sky: #7dd3fc;
+  --color-butter: #fde047;
   color-scheme: dark;
 }
 
@@ -55,9 +55,9 @@ html.dark body {
   color: var(--color-ink);
   background-color: #0b0917;
   background-image:
-    radial-gradient(900px 500px at 8% -10%, rgba(155, 127, 232, 0.22), transparent 60%),
-    radial-gradient(800px 500px at 100% 0%, rgba(240, 141, 181, 0.16), transparent 60%),
-    radial-gradient(900px 600px at 50% 110%, rgba(100, 140, 255, 0.14), transparent 60%);
+    radial-gradient(900px 500px at 8% -10%, rgba(168, 85, 247, 0.22), transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, rgba(244, 114, 182, 0.16), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(125, 211, 252, 0.14), transparent 60%);
 }
 
 ::selection {
@@ -65,7 +65,7 @@ html.dark body {
 }
 
 html.dark ::selection {
-  background: rgba(176, 150, 245, 0.4);
+  background: rgba(168, 85, 247, 0.45);
 }
 
 * {
@@ -74,7 +74,7 @@ html.dark ::selection {
 }
 
 html.dark * {
-  scrollbar-color: rgba(176, 150, 245, 0.3) transparent;
+  scrollbar-color: rgba(168, 85, 247, 0.35) transparent;
 }
 
 .glass {
@@ -85,11 +85,11 @@ html.dark * {
   box-shadow: 0 8px 30px rgba(120, 90, 200, 0.1);
 }
 html.dark .glass {
-  background: rgba(22, 17, 40, 0.78);
+  background: rgba(20, 15, 38, 0.82);
   backdrop-filter: blur(20px) saturate(1.3);
   -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  border: 1px solid rgba(176, 150, 245, 0.18);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
 }
 
 .card {
@@ -99,9 +99,9 @@ html.dark .glass {
   box-shadow: 0 4px 18px rgba(120, 90, 200, 0.08);
 }
 html.dark .card {
-  background: rgba(26, 20, 48, 0.82);
-  border: 1px solid rgba(176, 150, 245, 0.16);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  background: rgba(23, 17, 44, 0.85);
+  border: 1px solid rgba(168, 85, 247, 0.18);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.48);
 }
 
 .btn {
@@ -133,6 +133,15 @@ html.dark .card {
   box-shadow: 0 8px 24px rgba(155, 127, 232, 0.45);
   transform: translateY(-1px);
 }
+html.dark .btn-primary {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.45);
+}
+html.dark .btn-primary:hover {
+  background: linear-gradient(135deg, #b76bf8 0%, #f45ca7 100%);
+  box-shadow: 0 8px 26px rgba(168, 85, 247, 0.6);
+}
 .btn-soft {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(155, 127, 232, 0.2);
@@ -142,13 +151,13 @@ html.dark .card {
   background: #fff;
 }
 html.dark .btn-soft {
-  background: rgba(40, 32, 70, 0.8);
-  border: 1px solid rgba(176, 150, 245, 0.22);
-  color: #f2eefa;
+  background: rgba(35, 27, 58, 0.85);
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  color: #f8f6fd;
 }
 html.dark .btn-soft:hover {
-  background: rgba(60, 48, 102, 0.95);
-  border-color: rgba(176, 150, 245, 0.35);
+  background: rgba(54, 42, 88, 0.95);
+  border-color: rgba(168, 85, 247, 0.4);
 }
 
 .btn-ghost {

@@ -47,12 +47,12 @@ export default function ImportPage() {
 
   return (
     <div className="flex w-full flex-col gap-6 transition-all duration-300">
-      <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-mint via-sky to-lilac dark:from-[#1b3838] dark:via-[#1e2a4d] dark:to-[#2e1d4d] p-6 shadow-lg shadow-lilac-deep/15 dark:shadow-black/40 border border-transparent dark:border-white/10 transition-all duration-300 md:p-8">
-        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 dark:bg-mint/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-pink/40 dark:bg-lilac-deep/15 blur-2xl pointer-events-none" />
+      <section className="relative w-full overflow-hidden rounded-[2rem] bg-gradient-to-br from-mint via-sky to-lilac dark:from-[#112435] dark:via-[#16203d] dark:to-[#1e153b] p-6 shadow-lg shadow-lilac-deep/15 dark:shadow-black/50 border border-transparent dark:border-white/10 transition-all duration-300 md:p-8">
+        <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 dark:bg-emerald-400/10 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-pink/40 dark:bg-purple-500/15 blur-2xl pointer-events-none" />
         <div className="relative max-w-xl">
-          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/60 dark:bg-white/10 dark:text-mint px-3 py-1 text-xs font-black text-ink">
-            <Link2 size={13} /> Playlist converter
+          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 dark:bg-white/10 dark:text-emerald-300 dark:border dark:border-white/10 px-3 py-1 text-xs font-black text-ink">
+            <Link2 size={13} className="text-mint dark:text-emerald-300" /> Playlist converter
           </p>
           <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink dark:text-white">
             Import from Spotify
@@ -62,7 +62,7 @@ export default function ImportPage() {
           </p>
           <form className="flex flex-col gap-2 sm:flex-row max-w-xl" onSubmit={run}>
             <input
-              className="input !rounded-2xl"
+              className="input !rounded-2xl dark:!bg-[#120d24] dark:!border-white/20 dark:!text-white dark:placeholder-white/40"
               placeholder="https://open.spotify.com/playlist/…"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -70,7 +70,7 @@ export default function ImportPage() {
               required
             />
             <button
-              className="btn btn-primary shrink-0 dark:!bg-white dark:!text-[#0c0918]"
+              className="btn btn-primary shrink-0"
               disabled={busy || !url.trim()}
             >
               {busy ? <Spinner size={16} /> : <Link2 size={16} />} {busy ? "Matching tracks…" : "Import"}

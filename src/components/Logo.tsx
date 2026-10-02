@@ -27,10 +27,10 @@ export default function Logo({ size = 38, showText = true, className = "", href 
       <SongLogoIcon size={size} />
       {showText && (
         <span
-          className="text-[21px] font-extrabold uppercase select-none tracking-[0.18em] flex items-center drop-shadow-[0_1px_1px_rgba(255,255,255,0.75)] transition-all"
+          className="text-[22px] font-black uppercase select-none tracking-[0.2em] flex items-center transition-all"
           style={{ fontFamily: "'Outfit', 'Space Grotesk', system-ui, sans-serif" }}
         >
-          <span className="bg-gradient-to-r from-[#3a3059] via-[#6d579f] to-[#aa83e6] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#2c224b] via-[#6542a8] to-[#9861f4] dark:from-white dark:via-[#e2d5fc] dark:to-[#c084fc] bg-clip-text text-transparent drop-shadow-xs dark:drop-shadow-[0_0_12px_rgba(192,132,252,0.5)]">
             5ONG
           </span>
         </span>
