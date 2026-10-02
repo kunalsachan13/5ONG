@@ -822,9 +822,10 @@ export const firebaseDb = {
       try {
         const [existing] = await db.select().from(rooms).where(eq(rooms.code, cleanCode)).limit(1);
         if (existing) {
+          const merged = { ...(typeof existing.state === "object" && existing.state ? existing.state : {}), ...data };
           await db
             .update(rooms)
-            .set({ state: data, stateUpdatedAt: new Date() })
+            .set({ state: merged, stateUpdatedAt: new Date() })
             .where(eq(rooms.code, cleanCode));
         } else {
           await db.insert(rooms).values({

@@ -61,7 +61,7 @@ export default function PlayerBar() {
             onClick={() => p.setPanel(p.panel ? null : "player")}
           >
             <Cover src={t?.cover} size={52} />
-            <span className="absolute inset-0 hidden place-items-center rounded-xl bg-ink/40 text-white group-hover:grid">
+            <span className="absolute inset-0 hidden place-items-center rounded-xl bg-black/60 text-white group-hover:grid">
               <ChevronUp size={20} />
             </span>
           </button>

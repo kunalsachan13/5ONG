@@ -150,10 +150,10 @@ function LibraryInner() {
               </div>
               <div className="flex flex-col">
                 {history.slice(0, 100).map((h, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-2xl px-2.5 py-2 hover:bg-white/70">
+                  <div key={i} className="flex items-center gap-3 rounded-2xl px-2.5 py-2 hover:bg-white/70 dark:hover:bg-white/10 transition-colors">
                     <Cover src={h.cover} size={40} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{h.title}</p>
+                      <p className="truncate text-sm font-bold text-ink">{h.title}</p>
                       <p className="truncate text-xs text-muted">{h.artist}</p>
                     </div>
                     <span className="text-xs text-muted">{timeAgo(h.playedAt)}</span>

@@ -59,7 +59,7 @@ export function TrackMenuButton({ track, onRemove, className = "" }: { track: Tr
     };
   }, [open]);
 
-  const item = "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-lilac/30";
+  const item = "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-lilac/30 dark:hover:bg-white/10 transition";
 
   return (
     <>
@@ -184,18 +184,18 @@ export function TrackRow({
   return (
     <div
       className={`group flex items-center gap-3 rounded-2xl px-2.5 py-2 transition-colors ${
-        isCur ? "bg-lilac/30" : "hover:bg-white/70"
+        isCur ? "bg-lilac/30 dark:bg-white/15" : "hover:bg-white/70 dark:hover:bg-white/10"
       }`}
       onDoubleClick={() => playTrack(track, list)}
     >
       <button
-        className="relative shrink-0"
+        className="relative shrink-0 overflow-hidden rounded-xl"
         aria-label={isCur && playing ? `Pause ${track.title}` : `Play ${track.title}`}
         onClick={() => (isCur ? toggle() : playTrack(track, list))}
       >
         <Cover src={track.cover} size={46} />
         <span
-          className={`absolute inset-0 grid place-items-center rounded-xl bg-ink/35 text-white transition-opacity ${
+          className={`absolute inset-0 grid place-items-center rounded-xl bg-ink/35 dark:bg-black/60 text-white transition-opacity ${
             isCur ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}
         >
@@ -215,7 +215,7 @@ export function TrackRow({
         <p className={`truncate text-sm font-bold ${isCur ? "text-lilac-deep" : ""}`}>
           {track.title}
           {track.explicit && (
-            <span className="ml-1.5 rounded bg-ink/10 px-1 py-px align-middle text-[9px] font-black text-muted">E</span>
+            <span className="ml-1.5 rounded bg-ink/10 dark:bg-white/15 px-1 py-px align-middle text-[9px] font-black text-muted">E</span>
           )}
         </p>
         <p className="truncate text-xs text-muted">

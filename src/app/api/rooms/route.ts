@@ -19,7 +19,7 @@ export async function POST(req: Request) {
         code,
         hostId: u.id,
         hostName: u.username,
-        members: [{ userId: u.id, name: u.username, lastSeen: new Date().toISOString() }],
+        members: [{ userId: u.id, name: u.username, avatarUrl: u.avatarUrl || null, lastSeen: new Date().toISOString() }],
         state: null,
         createdAt: new Date().toISOString(),
       };
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       const room = await firebaseDb.getRoom(code);
       if (!room) throw new HttpError(404, "No room with that invite code");
       const members = Array.isArray(room.members) ? room.members.filter((m: any) => String(m.userId) !== String(u.id)) : [];
-      members.push({ userId: u.id, name: u.username, lastSeen: new Date().toISOString() });
+      members.push({ userId: u.id, name: u.username, avatarUrl: u.avatarUrl || null, lastSeen: new Date().toISOString() });
       await firebaseDb.saveRoom(code, { members });
       return Response.json({ code });
     }

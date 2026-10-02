@@ -69,7 +69,10 @@ export default function ImportPage() {
               aria-label="Spotify link"
               required
             />
-            <button className="btn btn-primary shrink-0 !bg-ink !text-white" disabled={busy || !url.trim()}>
+            <button
+              className="btn btn-primary shrink-0 dark:!bg-white dark:!text-[#0c0918]"
+              disabled={busy || !url.trim()}
+            >
               {busy ? <Spinner size={16} /> : <Link2 size={16} />} {busy ? "Matching tracks…" : "Import"}
             </button>
           </form>

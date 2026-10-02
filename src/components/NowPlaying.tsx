@@ -61,10 +61,10 @@ function PlayerTab() {
           >
             <Heart size={16} fill={liked ? "currentColor" : "none"} /> {liked ? "Liked" : "Like"}
           </button>
-          <div className="flex items-center overflow-hidden rounded-full border border-lilac-deep/25 bg-white/80">
+          <div className="flex items-center overflow-hidden rounded-full border border-lilac-deep/25 dark:border-white/10 bg-white/80 dark:bg-white/10 text-ink dark:text-white">
             <select
               aria-label="Download quality"
-              className="bg-transparent py-2 pl-3 pr-1 text-sm font-bold outline-none"
+              className="bg-transparent py-2 pl-3 pr-1 text-sm font-bold outline-none text-ink dark:text-white [&>option]:bg-white [&>option]:text-ink dark:[&>option]:!bg-[#1c1636] dark:[&>option]:!text-white"
               value={quality}
               onChange={(e) => setQuality(Number(e.target.value))}
             >
@@ -77,11 +77,11 @@ function PlayerTab() {
             </button>
           </div>
           {/* Sleep timer selector */}
-          <div className="flex items-center rounded-full border border-lilac-deep/25 bg-white/80 px-2.5 py-1.5 text-xs font-bold">
+          <div className="flex items-center rounded-full border border-lilac-deep/25 dark:border-white/10 bg-white/80 dark:bg-white/10 px-2.5 py-1.5 text-xs font-bold text-ink dark:text-white">
             <span className="mr-1.5 opacity-60">⏳</span>
             <select
               aria-label="Sleep timer"
-              className="bg-transparent text-xs font-bold outline-none"
+              className="bg-transparent text-xs font-bold outline-none text-ink dark:text-white [&>option]:bg-white [&>option]:text-ink dark:[&>option]:!bg-[#1c1636] dark:[&>option]:!text-white"
               value={p.sleepTimer ?? 0}
               onChange={(e) => {
                 const val = Number(e.target.value);
@@ -96,10 +96,10 @@ function PlayerTab() {
             </select>
           </div>
           {/* Playback speed selector */}
-          <div className="flex items-center rounded-full border border-lilac-deep/25 bg-white/80 px-2.5 py-1.5 text-xs font-bold">
+          <div className="flex items-center rounded-full border border-lilac-deep/25 dark:border-white/10 bg-white/80 dark:bg-white/10 px-2.5 py-1.5 text-xs font-bold text-ink dark:text-white">
             <select
               aria-label="Playback speed"
-              className="bg-transparent text-xs font-bold outline-none"
+              className="bg-transparent text-xs font-bold outline-none text-ink dark:text-white [&>option]:bg-white [&>option]:text-ink dark:[&>option]:!bg-[#1c1636] dark:[&>option]:!text-white"
               value={p.playbackRate}
               onChange={(e) => p.setPlaybackRate(Number(e.target.value))}
             >
@@ -110,7 +110,7 @@ function PlayerTab() {
               <option value={2}>2.0×</option>
             </select>
           </div>
-          <TrackMenuButton track={t} className="!bg-white/80" />
+          <TrackMenuButton track={t} className="!bg-white/80 dark:!bg-white/10 text-ink dark:text-white" />
         </div>
         {/* Stream quality indicator */}
         <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ function PlayerTab() {
             </button>
           ))}
           <span className="ml-2 hidden text-[11px] text-muted sm:block">
-            press <kbd className="rounded bg-white px-1">V</kbd> to cycle
+            press <kbd className="rounded bg-white dark:bg-white/15 px-1 text-ink dark:text-white">V</kbd> to cycle
           </span>
         </div>
       </div>

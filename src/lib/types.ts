@@ -42,12 +42,28 @@ export interface LyricsResult {
   instrumental?: boolean;
 }
 
+export interface RoomMember {
+  userId: string | number;
+  name: string;
+  avatarUrl?: string | null;
+}
+
+export interface RoomChatMessage {
+  id: string;
+  userId: string | number;
+  userName: string;
+  userAvatar?: string | null;
+  text: string;
+  timestamp: number;
+}
+
 export interface RoomInfo {
   code: string;
   hostId: number;
   hostName: string;
   isHost: boolean;
-  members: { userId: number; name: string }[];
+  members: RoomMember[];
+  messages?: RoomChatMessage[];
   state: {
     track: Track | null;
     queue: Track[];

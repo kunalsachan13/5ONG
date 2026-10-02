@@ -49,6 +49,7 @@ interface PlayerCtx {
   room: RoomInfo | null;
   roomCode: string | null;
   locked: boolean;
+  setRoom: (r: RoomInfo | null) => void;
   setPanel: (p: Tab | null) => void;
   setHelpOpen: (v: boolean) => void;
   setVizMode: (m: VizMode) => void;
@@ -1304,6 +1305,7 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     room,
     roomCode,
     locked,
+    setRoom,
     setPanel,
     setHelpOpen,
     setVizMode,

@@ -43,14 +43,19 @@ export default function HomePage() {
             <Sparkles size={13} /> {user ? `Welcome back, ${user.username}` : "Welcome to 5ONG"}
           </p>
           <h1 className="text-3xl font-black leading-tight md:text-5xl text-ink">Music that moves with you.</h1>
-          <p className="mt-2 text-sm font-semibold text-ink/75 dark:text-ink/80 md:text-base">
-            Tune it with a live equalizer, sing along with synced lyrics, or start a room and listen together.
-          </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <button className="btn bg-ink text-white dark:bg-white dark:text-ink shadow-lg hover:scale-105" disabled={!tracks.length} onClick={() => playList(tracks, 0)}>
+            <button
+              className="btn bg-ink text-white dark:bg-white dark:!text-[#0c0918] shadow-lg hover:scale-105"
+              disabled={!tracks.length}
+              onClick={() => playList(tracks, 0)}
+            >
               <Play size={16} fill="currentColor" /> Play top charts
             </button>
-            <button className="btn bg-white/80 dark:bg-white/10 dark:text-white dark:hover:bg-white/20" disabled={!tracks.length} onClick={() => shufflePlay(tracks)}>
+            <button
+              className="btn bg-white/80 dark:bg-white/10 dark:text-white"
+              disabled={!tracks.length}
+              onClick={() => shufflePlay(tracks)}
+            >
               <Sparkles size={16} /> Smart shuffle
             </button>
           </div>
@@ -63,7 +68,7 @@ export default function HomePage() {
             <button key={t.id} className="group w-36 shrink-0 text-left" onClick={() => playList(recent, idx)}>
               <div className="relative">
                 <Cover src={t.coverBig || t.cover} size={144} rounded="rounded-2xl" className="shadow-md transition group-hover:-translate-y-1 group-hover:shadow-xl" />
-                <span className="absolute bottom-2 right-2 grid h-9 w-9 translate-y-1 place-items-center rounded-full bg-white text-lilac-deep opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100">
+                <span className="absolute bottom-2 right-2 grid h-9 w-9 translate-y-1 place-items-center rounded-full bg-white dark:bg-lilac-deep text-lilac-deep dark:text-white opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100">
                   <Play size={16} fill="currentColor" />
                 </span>
               </div>

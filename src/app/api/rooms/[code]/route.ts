@@ -1,4 +1,5 @@
 import { firebaseDb } from "@/lib/firebaseDb";
+import { roomChatManager } from "@/lib/roomChatStore";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth";
 import type { RoomInfo } from "@/lib/types";
 
@@ -11,10 +12,45 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
     const room = await firebaseDb.getRoom(code);
     if (!room) throw new HttpError(404, "This room has ended");
 
-    const rawMembers = Array.isArray(room.members) ? room.members : [];
-    const members = rawMembers
-      .filter((m: any) => Date.now() - new Date(m.lastSeen || 0).getTime() < 15_000)
-      .map((m: any) => ({ userId: m.userId, name: m.name }));
+    const rawMembers: any[] = Array.isArray(room.members) ? room.members : [];
+    const now = Date.now();
+    let found = false;
+
+    const updatedMembers = rawMembers.map((m: any) => {
+      if (String(m.userId) === String(u.id)) {
+        found = true;
+        return {
+          ...m,
+          name: u.username,
+          avatarUrl: u.avatarUrl || m.avatarUrl || null,
+          lastSeen: new Date().toISOString(),
+        };
+      }
+      return m;
+    });
+
+    if (!found) {
+      updatedMembers.push({
+        userId: u.id,
+        name: u.username,
+        avatarUrl: u.avatarUrl || null,
+        lastSeen: new Date().toISOString(),
+      });
+    }
+
+    // Active within last 30 seconds
+    const activeMembers = updatedMembers.filter(
+      (m: any) => now - new Date(m.lastSeen || 0).getTime() < 30_000
+    );
+
+    // Save active members back so all users see current presence
+    await firebaseDb.saveRoom(code, { members: activeMembers });
+
+    const members = activeMembers.map((m: any) => ({
+      userId: Number(m.userId),
+      name: m.name,
+      avatarUrl: m.avatarUrl || null,
+    }));
 
     const info: RoomInfo = {
       code,
@@ -22,6 +58,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
       hostName: room.hostName ?? "host",
       isHost: String(room.hostId) === String(u.id),
       members,
+      messages: roomChatManager.getMessages(code),
       state: room.state || null,
       updatedAt: room.stateUpdatedAt ? new Date(room.stateUpdatedAt).getTime() : Date.now(),
       serverNow: Date.now(),
@@ -63,6 +100,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ code: strin
     if (!room) return Response.json({ ok: true });
     if (String(room.hostId) === String(u.id)) {
       await firebaseDb.deleteRoom(code);
+      roomChatManager.deleteRoomChat(code);
     } else {
       const rawMembers = Array.isArray(room.members) ? room.members : [];
       const updatedMembers = rawMembers.filter((m: any) => String(m.userId) !== String(u.id));

@@ -4,7 +4,6 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "5ONG",
     short_name: "5ONG",
-    description: "Stream, equalize and share music in sync.",
     start_url: "/",
     scope: "/",
     display: "standalone",

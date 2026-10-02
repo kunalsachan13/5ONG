@@ -9,11 +9,14 @@ import {
   Crown,
   ListMusic,
   LogOut,
+  MessageSquare,
   MicVocal,
   Minus,
   Plus,
   RotateCcw,
   Radio,
+  Send,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Users,
@@ -108,7 +111,7 @@ export function LyricsPanel() {
           <RotateCcw size={12} />
         </button>
         <span className="ml-auto hidden text-[11px] text-muted lg:block">
-          Keys <kbd className="rounded bg-white px-1">[</kbd> <kbd className="rounded bg-white px-1">]</kbd> · tap a line to sync it to now
+          Keys <kbd className="rounded bg-white dark:bg-white/15 px-1 text-ink dark:text-white">[</kbd> <kbd className="rounded bg-white dark:bg-white/15 px-1 text-ink dark:text-white">]</kbd> · tap a line to sync it to now
         </span>
       </div>
 
@@ -272,7 +275,9 @@ export function QueuePanel() {
             return (
               <div
                 key={t.id + ":" + i}
-                className={`group flex items-center gap-3 rounded-2xl px-2.5 py-2 ${cur ? "bg-lilac/35" : i < p.index ? "opacity-55 hover:opacity-100" : "hover:bg-white/70"}`}
+                className={`group flex items-center gap-3 rounded-2xl px-2.5 py-2 transition-colors ${
+                  cur ? "bg-lilac/35 dark:bg-white/15" : i < p.index ? "opacity-55 hover:opacity-100" : "hover:bg-white/70 dark:hover:bg-white/10"
+                }`}
               >
                 <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => p.jumpTo(i)}>
                   <Cover src={t.cover} size={42} />
@@ -387,6 +392,58 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
   }
 
   const room = p.room;
+  const [chatDraft, setChatDraft] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [room?.messages?.length]);
+
+  async function handleSendChat(e: React.FormEvent) {
+    e.preventDefault();
+    const text = chatDraft.trim();
+    if (!text || !p.roomCode || sendingChat) return;
+    setChatDraft("");
+    setSendingChat(true);
+
+    // Optimistically show message
+    if (user && p.room) {
+      const optimisticMsg = {
+        id: `opt-${Date.now()}`,
+        userId: user.id,
+        userName: user.username,
+        userAvatar: user.avatarUrl || null,
+        text,
+        timestamp: Date.now(),
+      };
+      p.setRoom({
+        ...p.room,
+        messages: [...(p.room.messages || []), optimisticMsg],
+      });
+    }
+
+    try {
+      const res = await fetch(`/api/rooms/${p.roomCode}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (p.room && data.messages) {
+          p.setRoom({ ...p.room, messages: data.messages });
+        }
+      }
+    } catch {
+      // transient
+    } finally {
+      setSendingChat(false);
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-4 transition-all duration-300">
       <div className="card flex flex-col items-center gap-3 p-6 text-center">
@@ -415,21 +472,152 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
             : "Playback follows the host. Volume and EQ stay yours."}
         </p>
       </div>
+
+      {/* Listening Now with Avatars */}
       <div className="card p-4">
         <h4 className="mb-3 flex items-center gap-2 text-sm font-extrabold">
           <Users size={16} /> Listening now ({room?.members.length ?? 1})
         </h4>
-        <div className="flex flex-wrap gap-2">
-          {(room?.members ?? []).map((m) => (
-            <span key={m.userId} className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-bold shadow-sm">
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-xs font-black">
-                {m.name[0]?.toUpperCase()}
+        <div className="flex flex-wrap gap-2.5">
+          {(room?.members ?? []).map((m) => {
+            const isMe = user && String(user.id) === String(m.userId);
+            const isHost = m.userId === room?.hostId;
+            return (
+              <span
+                key={m.userId}
+                className="flex items-center gap-2 rounded-full bg-white dark:bg-white/10 pl-1.5 pr-3 py-1 text-sm font-bold shadow-xs text-ink dark:text-white border border-ink/5 dark:border-white/10"
+              >
+                {m.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={m.avatarUrl}
+                    alt={m.name}
+                    className="h-7 w-7 rounded-full object-cover ring-2 ring-lilac-deep/30"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-xs font-black text-white">
+                    {m.name[0]?.toUpperCase()}
+                  </span>
+                )}
+                <span className="truncate max-w-[120px]">{m.name}</span>
+                {isHost && (
+                  <span title="Host">
+                    <Crown size={13} className="text-amber-500 fill-current shrink-0" />
+                  </span>
+                )}
+                {isMe && !isHost && (
+                  <span className="rounded-full bg-lilac/30 dark:bg-white/15 px-1.5 py-0.2 text-[10px] font-black text-lilac-deep dark:text-white">
+                    You
+                  </span>
+                )}
               </span>
-              {m.name}
-              {m.userId === room?.hostId && <Crown size={13} className="text-amber-500" />}
-            </span>
-          ))}
+            );
+          })}
         </div>
+      </div>
+
+      {/* Ephemeral Room Chat */}
+      <div className="card flex flex-col overflow-hidden border border-ink/5 dark:border-white/10 shadow-sm">
+        {/* Chat Header */}
+        <div className="flex items-center justify-between border-b border-ink/5 dark:border-white/10 px-4 py-3 bg-white/40 dark:bg-white/5">
+          <div className="flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-lilac/30 dark:bg-white/10 text-lilac-deep">
+              <MessageSquare size={16} />
+            </div>
+            <div>
+              <h4 className="text-sm font-extrabold leading-none">Room Chat</h4>
+              <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-muted">
+                <ShieldCheck size={12} className="text-emerald-500" /> Temporary · Auto-deleted when room ends
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-lilac/20 dark:bg-white/10 px-2.5 py-0.5 text-[11px] font-black text-lilac-deep dark:text-white">
+            {room?.messages?.length ?? 0} messages
+          </span>
+        </div>
+
+        {/* Messages Stream */}
+        <div
+          ref={chatScrollRef}
+          className="flex flex-col gap-3 p-4 overflow-y-auto max-h-72 min-h-[160px]"
+        >
+          {(!room?.messages || room.messages.length === 0) ? (
+            <div className="m-auto flex flex-col items-center justify-center py-6 text-center text-muted">
+              <MessageSquare size={28} className="mb-2 opacity-30 text-lilac-deep" />
+              <p className="text-xs font-bold">No messages yet</p>
+              <p className="text-[11px]">Chat with everyone in the room! Messages are private & temporary.</p>
+            </div>
+          ) : (
+            room.messages.map((msg) => {
+              const isMe = user && String(user.id) === String(msg.userId);
+              const isMsgHost = msg.userId === room.hostId;
+              const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-start gap-2.5 ${isMe ? "flex-row-reverse" : "flex-row"}`}
+                >
+                  {msg.userAvatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={msg.userAvatar}
+                      alt={msg.userName}
+                      className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/20 mt-0.5"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lilac to-pink text-[11px] font-black text-white mt-0.5">
+                      {msg.userName[0]?.toUpperCase()}
+                    </span>
+                  )}
+                  <div className={`flex flex-col max-w-[80%] ${isMe ? "items-end" : "items-start"}`}>
+                    <div className="flex items-center gap-1.5 mb-0.5 text-[11px] text-muted">
+                      <span className="font-extrabold text-ink dark:text-white/90">
+                        {isMe ? "You" : msg.userName}
+                      </span>
+                      {isMsgHost && (
+                        <span title="Host">
+                          <Crown size={11} className="text-amber-500 fill-current" />
+                        </span>
+                      )}
+                      <span>·</span>
+                      <span className="text-[10px]">{time}</span>
+                    </div>
+                    <div
+                      className={`rounded-2xl px-3.5 py-2 text-sm font-semibold break-words leading-relaxed ${
+                        isMe
+                          ? "bg-lilac/70 text-ink dark:bg-lilac-deep dark:text-white rounded-tr-xs shadow-xs"
+                          : "bg-white dark:bg-white/10 text-ink dark:text-white rounded-tl-xs border border-ink/5 dark:border-white/10 shadow-xs"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Chat Input Form */}
+        <form onSubmit={handleSendChat} className="flex items-center gap-2 border-t border-ink/5 dark:border-white/10 p-2.5 bg-white/30 dark:bg-white/5">
+          <input
+            className="input !rounded-full !py-2 !px-4 text-xs font-semibold flex-1"
+            placeholder="Type a message to the room…"
+            value={chatDraft}
+            onChange={(e) => setChatDraft(e.target.value)}
+            maxLength={300}
+          />
+          <button
+            type="submit"
+            disabled={!chatDraft.trim() || sendingChat}
+            className="btn btn-primary !rounded-full !p-2 shrink-0 aspect-square"
+            aria-label="Send message"
+          >
+            <Send size={15} />
+          </button>
+        </form>
       </div>
     </div>
   );

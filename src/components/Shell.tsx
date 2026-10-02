@@ -336,8 +336,10 @@ function Toasts() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pop-in glass pointer-events-auto max-w-md rounded-full px-4 py-2 text-sm font-bold ${
-            t.kind === "err" ? "!bg-pink/90" : "!bg-white/90"
+          className={`pop-in glass pointer-events-auto max-w-md rounded-full px-4 py-2 text-sm font-bold shadow-lg ${
+            t.kind === "err"
+              ? "!bg-pink/90 text-rose-950 dark:!bg-rose-950 dark:!text-rose-100 dark:border dark:border-rose-800"
+              : "!bg-white/95 text-ink dark:!bg-[#231b3e] dark:!text-white border border-ink/5 dark:border-white/10"
           }`}
         >
           {t.kind === "ok" ? "✓ " : "⚠ "}
@@ -352,7 +354,7 @@ function HelpModal() {
   const { helpOpen, setHelpOpen } = usePlayer();
   if (!helpOpen) return null;
   return (
-    <div className="fixed inset-0 z-[80] grid place-items-center bg-ink/30 p-4 backdrop-blur-sm" onClick={() => setHelpOpen(false)}>
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setHelpOpen(false)}>
       <div className="pop-in card max-h-[85vh] w-full max-w-lg overflow-y-auto p-6" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Keyboard shortcuts">
         <div className="mb-4 flex items-center gap-2">
           <Keyboard size={20} />
@@ -366,7 +368,7 @@ function HelpModal() {
             <div key={k} className="flex items-center justify-between gap-4 rounded-xl px-2 py-1.5 odd:bg-lilac/15">
               <dt className="text-sm text-muted">{d}</dt>
               <dd>
-                <kbd className="rounded-lg bg-white px-2 py-1 text-xs font-black shadow-sm">{k}</kbd>
+                <kbd className="rounded-lg bg-white/80 dark:bg-white/10 px-2 py-1 text-xs font-black shadow-sm text-ink dark:text-white border border-ink/10 dark:border-white/10">{k}</kbd>
               </dd>
             </div>
           ))}
@@ -393,7 +395,7 @@ function Sidebar({
     <aside
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`hidden shrink-0 flex-col gap-1 p-3.5 md:flex transition-all duration-300 ease-in-out select-none border-r border-white/50 bg-white/25 backdrop-blur-md z-40 ${
+      className={`hidden shrink-0 flex-col gap-1 p-3.5 md:flex transition-all duration-300 ease-in-out select-none border-r border-white/50 dark:border-white/10 bg-white/25 dark:bg-[#120d24]/60 backdrop-blur-md z-40 ${
         isExpanded ? "w-64" : "w-[76px]"
       }`}
     >
@@ -413,7 +415,7 @@ function Sidebar({
               className={`flex items-center gap-3.5 rounded-2xl py-2.5 text-sm font-extrabold transition-all duration-200 ${
                 isExpanded ? "px-3.5" : "justify-center px-0"
               } ${
-                active ? "bg-white shadow-sm text-ink" : "text-muted hover:bg-white/60 hover:text-ink"
+                active ? "bg-white dark:bg-white/15 shadow-sm text-ink dark:text-white" : "text-muted hover:bg-white/60 dark:hover:bg-white/10 hover:text-ink dark:hover:text-white"
               }`}
             >
               <Icon size={20} className={active ? "text-lilac-deep shrink-0" : "shrink-0"} />
@@ -433,7 +435,7 @@ function Sidebar({
             </Link>
           </>
         ) : (
-          <div className="h-px w-8 bg-ink/10 my-1" />
+          <div className="h-px w-8 bg-ink/10 dark:bg-white/10 my-1" />
         )}
       </div>
 
@@ -441,7 +443,7 @@ function Sidebar({
         <Link
           href="/library"
           title={!isExpanded ? `Liked Songs (${likes.length})` : undefined}
-          className={`flex items-center gap-3.5 rounded-xl py-2 text-sm font-bold text-muted hover:bg-white/60 hover:text-ink transition-all ${
+          className={`flex items-center gap-3.5 rounded-xl py-2 text-sm font-bold text-muted hover:bg-white/60 dark:hover:bg-white/10 hover:text-ink dark:hover:text-white transition-all ${
             isExpanded ? "px-3.5" : "justify-center px-0"
           }`}
         >
@@ -459,8 +461,8 @@ function Sidebar({
             <Link
               key={p.id}
               href={`/playlist/${p.id}`}
-              className={`flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-bold hover:bg-white/60 hover:text-ink transition-all ${
-                path === `/playlist/${p.id}` ? "bg-white/70 text-ink" : "text-muted"
+              className={`flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-bold hover:bg-white/60 dark:hover:bg-white/10 hover:text-ink dark:hover:text-white transition-all ${
+                path === `/playlist/${p.id}` ? "bg-white/70 dark:bg-white/15 text-ink dark:text-white" : "text-muted"
               }`}
             >
               <ListMusic size={16} className="shrink-0" />
@@ -472,7 +474,7 @@ function Sidebar({
           <Link
             href="/library"
             title="Your Playlists"
-            className="flex items-center justify-center rounded-xl py-2 text-muted hover:bg-white/60 hover:text-ink"
+            className="flex items-center justify-center rounded-xl py-2 text-muted hover:bg-white/60 dark:hover:bg-white/10 hover:text-ink dark:hover:text-white"
           >
             <ListMusic size={18} className="shrink-0" />
           </Link>
@@ -483,7 +485,7 @@ function Sidebar({
 
       <div className="mt-2 flex flex-col gap-1 text-xs text-muted">
         <button
-          className={`flex items-center gap-2 rounded-xl py-2 font-bold hover:bg-white/60 transition-all ${
+          className={`flex items-center gap-2 rounded-xl py-2 font-bold hover:bg-white/60 dark:hover:bg-white/10 hover:text-ink dark:hover:text-white transition-all ${
             isExpanded ? "px-3.5" : "justify-center px-0"
           }`}
           onClick={() => setHelpOpen(true)}
@@ -493,7 +495,7 @@ function Sidebar({
           {isExpanded && (
             <>
               <span className="truncate">Shortcuts</span>
-              <kbd className="ml-auto rounded bg-white px-1.5 py-0.5 text-[10px] font-black">?</kbd>
+              <kbd className="ml-auto rounded bg-white dark:bg-white/15 px-1.5 py-0.5 text-[10px] font-black text-ink dark:text-white">?</kbd>
             </>
           )}
         </button>
@@ -547,7 +549,7 @@ function MobileNav() {
             href={href}
             onClick={() => setPanel(null)}
             className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
-              active && !panel ? "bg-white/80 text-ink shadow-xs" : "text-muted"
+              active && !panel ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
             }`}
           >
             <Icon size={20} className={active && !panel ? "text-lilac-deep" : ""} />
@@ -557,7 +559,7 @@ function MobileNav() {
       })}
       <button
         className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
-          panel === "eq" ? "bg-white/80 text-ink shadow-xs" : "text-muted"
+          panel === "eq" ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
         }`}
         onClick={() => setPanel(panel === "eq" ? null : "eq")}
       >
