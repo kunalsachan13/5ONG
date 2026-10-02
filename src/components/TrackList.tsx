@@ -211,8 +211,21 @@ export function TrackRow({
         </span>
       </button>
       <span className="hidden w-6 text-center text-xs font-bold text-muted sm:block">{index + 1}</span>
-      <div className="min-w-0 flex-1">
-        <p className={`truncate text-sm font-bold ${isCur ? "text-lilac-deep" : ""}`}>
+      <div
+        className="min-w-0 flex-1 cursor-pointer select-none py-0.5"
+        role="button"
+        tabIndex={0}
+        aria-label={isCur && playing ? `Pause ${track.title}` : `Play ${track.title}`}
+        onClick={() => (isCur ? toggle() : playTrack(track, list))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (isCur) toggle();
+            else playTrack(track, list);
+          }
+        }}
+      >
+        <p className={`truncate text-sm font-bold ${isCur ? "text-lilac-deep" : "group-hover:text-lilac-deep dark:group-hover:text-purple-300 transition-colors"}`}>
           {track.title}
           {track.explicit && (
             <span className="ml-1.5 rounded bg-ink/10 dark:bg-white/15 px-1 py-px align-middle text-[9px] font-black text-muted">E</span>
