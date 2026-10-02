@@ -896,9 +896,31 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 3. Fallback standard browser download
+      // 3. Web Mobile / Android device save sheet
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          toast(`Preparing “${t.title}” download…`);
+          const res = await fetch(downloadRelUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const file = new File([blob], filename, { type: "audio/mpeg" });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: filename,
+              });
+              toast(`“${t.title}” ready!`);
+              return;
+            }
+          }
+        } catch (e: any) {
+          if (e.name === "AbortError") return;
+        }
+      }
+
+      // 4. Fallback standard browser download
       const a = document.createElement("a");
-      a.href = downloadRelUrl;
+      a.href = absoluteUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();

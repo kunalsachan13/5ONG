@@ -152,15 +152,25 @@ public class MainActivity extends BridgeActivity {
                     conn.setRequestProperty("User-Agent", "5ONG-Android/2.0");
 
                     int responseCode = conn.getResponseCode();
-                    // Handle redirects manually if needed
-                    if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == 307) {
+                    int redirects = 0;
+                    while ((responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                            responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                            responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                            responseCode == 307 || 
+                            responseCode == 308) && redirects < 5) {
                         String newUrl = conn.getHeaderField("Location");
                         conn.disconnect();
+                        if (newUrl.startsWith("/")) {
+                            newUrl = "https://5ong.vercel.app" + newUrl;
+                        }
                         url = new URL(newUrl);
                         conn = (HttpURLConnection) url.openConnection();
                         conn.setConnectTimeout(15000);
                         conn.setReadTimeout(30000);
                         conn.setInstanceFollowRedirects(true);
+                        conn.setRequestProperty("User-Agent", "5ONG-Android/2.0");
+                        responseCode = conn.getResponseCode();
+                        redirects++;
                     }
 
                     in = conn.getInputStream();
