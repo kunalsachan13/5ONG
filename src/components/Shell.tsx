@@ -309,7 +309,7 @@ function SearchBox() {
   }, [path]);
   return (
     <form
-      className="relative w-full max-w-md"
+      className="relative w-full"
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
@@ -319,12 +319,22 @@ function SearchBox() {
       <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
       <input
         id="global-search"
-        className="input !rounded-full !py-2.5 !pl-10 !pr-12"
-        placeholder="Search songs, artists…  ( / )"
+        className="input !rounded-full !py-2 sm:!py-2.5 !pl-10 !pr-10 text-sm font-semibold w-full"
+        placeholder="Search songs, artists, albums…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
         aria-label="Search"
       />
+      {q && (
+        <button
+          type="button"
+          onClick={() => setQ("")}
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink dark:hover:text-white transition-colors"
+          aria-label="Clear search"
+        >
+          <X size={16} />
+        </button>
+      )}
     </form>
   );
 }
@@ -590,13 +600,17 @@ export default function Shell({ children }: { children: ReactNode }) {
         className="flex min-w-0 flex-1 flex-col transition-all duration-300"
         onMouseEnter={() => setSidebarHovered(false)}
       >
-        <header className="flex items-center gap-2.5 px-3 py-2.5 sm:px-6 md:px-8 md:py-4">
-          <Logo className="md:hidden" size={32} />
-          <div className="flex flex-1 justify-center md:justify-start min-w-0">
+        <header className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-6 md:px-8 md:py-4">
+          <div className="flex items-center gap-2">
+            <Logo className="md:hidden" size={32} />
+          </div>
+          <div className="order-3 w-full sm:order-2 sm:flex-1 sm:max-w-md min-w-0">
             <SearchBox />
           </div>
-          <ThemeToggle />
-          <UserMenu />
+          <div className="order-2 sm:order-3 flex items-center gap-2 shrink-0">
+            <ThemeToggle />
+            <UserMenu />
+          </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-44 sm:px-6 md:px-8 md:pb-28">
           {children}
