@@ -160,7 +160,9 @@ function LoginInner() {
     <div className="mx-auto grid max-w-md gap-6 py-4 md:py-10">
       <div className="text-center">
         <SongLogoIcon size={68} className="mx-auto mb-3" />
-        <h1 className="text-3xl font-black">Sign in to 5ONG</h1>
+        <h1 className="text-3xl font-black">
+          Sign in to <span className="tracking-[0.14em] bg-gradient-to-r from-[#3a3059] via-[#6d579f] to-[#aa83e6] bg-clip-text text-transparent" style={{ fontFamily: "'Outfit', 'Space Grotesk', sans-serif" }}>5ONG</span>
+        </h1>
         <p className="text-sm text-muted">Save playlists, liked songs and enjoy personalized music.</p>
       </div>
 

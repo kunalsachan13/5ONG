@@ -26,8 +26,13 @@ export default function Logo({ size = 38, showText = true, className = "", href 
     <div className={`flex items-center gap-2.5 ${className}`}>
       <SongLogoIcon size={size} />
       {showText && (
-        <span className="text-xl font-black tracking-tight text-ink select-none flex items-center">
-          5<span className="bg-gradient-to-r from-lilac-deep via-pink-deep to-peach bg-clip-text text-transparent">ONG</span>
+        <span
+          className="text-[21px] font-extrabold uppercase select-none tracking-[0.18em] flex items-center drop-shadow-[0_1px_1px_rgba(255,255,255,0.75)] transition-all"
+          style={{ fontFamily: "'Outfit', 'Space Grotesk', system-ui, sans-serif" }}
+        >
+          <span className="bg-gradient-to-r from-[#3a3059] via-[#6d579f] to-[#aa83e6] bg-clip-text text-transparent">
+            5ONG
+          </span>
         </span>
       )}
     </div>
