@@ -840,6 +840,10 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.85 } });
       } catch (_) {}
 
+      const cleanTitle = (t.title || "Track").replace(/[/\\?%*:|"<>]/g, "_");
+      const cleanArtist = (t.artist || "Artist").replace(/[/\\?%*:|"<>]/g, "_");
+      const filename = `${cleanArtist} - ${cleanTitle} [${quality}k].mp3`;
+
       const params = new URLSearchParams({
         title: t.title,
         artist: t.artist,
@@ -848,9 +852,54 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         quality: String(quality),
       });
 
+      const downloadRelUrl = `/api/download/${t.id}?${params.toString()}`;
+      const absoluteUrl =
+        typeof window !== "undefined" && window.location?.origin
+          ? `${window.location.origin}${downloadRelUrl}`
+          : downloadRelUrl;
+
+      // 1. Android Native App (prompts user to pick folder via Android System File Picker)
+      const androidDownloader = typeof window !== "undefined" ? (window as any).AndroidDownloader : null;
+      if (androidDownloader && typeof androidDownloader.downloadFile === "function") {
+        toast(`Select where to save “${t.title}”…`);
+        androidDownloader.downloadFile(absoluteUrl, filename, "audio/mpeg");
+        return;
+      }
+
+      // 2. Modern Web Browser with File System Access API (Save As file dialog)
+      if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: "MP3 Audio",
+                accept: { "audio/mpeg": [".mp3"] },
+              },
+            ],
+          });
+          toast(`Saving “${t.title}” to chosen location…`);
+          const res = await fetch(downloadRelUrl);
+          if (!res.ok) throw new Error("Download request failed");
+          const blob = await res.blob();
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          toast(`Saved “${t.title}” successfully!`);
+          return;
+        } catch (err: any) {
+          if (err.name === "AbortError") {
+            // User cancelled folder picker
+            return;
+          }
+          // If showSaveFilePicker threw another error, fallback to <a> download
+        }
+      }
+
+      // 3. Fallback standard browser download
       const a = document.createElement("a");
-      a.href = `/api/download/${t.id}?${params.toString()}`;
-      a.download = `${t.artist} - ${t.title} [${quality}k].mp3`;
+      a.href = downloadRelUrl;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
