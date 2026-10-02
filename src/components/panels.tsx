@@ -472,14 +472,33 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
           <button className="btn btn-soft" onClick={() => copy("link")}>
             {copied === "link" ? <Check size={14} /> : <Copy size={14} />} Copy invite link
           </button>
-          <button className="btn btn-primary" onClick={p.leaveRoom}>
-            <LogOut size={14} /> {room?.isHost ? "End room" : "Leave"}
-          </button>
+          {room?.isHost ? (
+            <>
+              <button
+                className="btn btn-soft text-ink dark:text-white"
+                onClick={p.leaveRoom}
+                title="Leave room (Host role will be assigned to a random listener)"
+              >
+                <LogOut size={14} /> Leave room
+              </button>
+              <button
+                className="btn !bg-rose-500 hover:!bg-rose-600 !text-white shadow-xs"
+                onClick={p.endRoom}
+                title="End room for everyone and delete chat"
+              >
+                <Trash2 size={14} /> End room
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-primary" onClick={p.leaveRoom}>
+              <LogOut size={14} /> Leave
+            </button>
+          )}
         </div>
         <p className="max-w-md text-xs text-muted">
           {room?.isHost
-            ? "Play, pause, seek and skip — everyone in the room follows you."
-            : "Playback follows the host. Volume and EQ stay yours."}
+            ? "Play, pause, seek and skip — everyone follows you. If you leave, another listener randomly becomes host. Click 'End room' to delete room & chats."
+            : "Playback follows the host. Volume and EQ stay yours. Leaving keeps the chat safe for remaining listeners."}
         </p>
       </div>
 
@@ -523,6 +542,15 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
                     You
                   </span>
                 )}
+                {room?.isHost && !isMe && !isHost && (
+                  <button
+                    onClick={() => p.transferHost(m.userId)}
+                    title={`Transfer host to ${displayName}`}
+                    className="ml-1 flex items-center gap-1 rounded-full bg-lilac/30 hover:bg-lilac/60 dark:bg-white/15 dark:hover:bg-white/25 px-2 py-0.5 text-[10px] font-black text-lilac-deep dark:text-amber-300 transition-all cursor-pointer"
+                  >
+                    <Crown size={10} /> Make host
+                  </button>
+                )}
               </span>
             );
           })}
@@ -540,7 +568,7 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
             <div>
               <h4 className="text-sm font-extrabold leading-none">Room Chat</h4>
               <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-muted">
-                <ShieldCheck size={12} className="text-emerald-500" /> Temporary · Auto-deleted when room ends
+                <ShieldCheck size={12} className="text-emerald-500" /> Temporary · Auto-deleted only when host ends room
               </p>
             </div>
           </div>
@@ -562,6 +590,15 @@ export function RoomPanel({ initialCode }: { initialCode?: string }) {
             </div>
           ) : (
             (room?.messages ?? []).map((msg, idx) => {
+              if (msg?.userId === "system" || msg?.userName === "System") {
+                return (
+                  <div key={msg?.id ?? idx} className="my-1 flex justify-center">
+                    <span className="rounded-full bg-lilac/25 dark:bg-white/10 px-3 py-1 text-[11px] font-bold text-lilac-deep dark:text-amber-300 border border-ink/5 dark:border-white/10 shadow-xs text-center max-w-[90%]">
+                      {msg.text}
+                    </span>
+                  </div>
+                );
+              }
               const isMe = user && String(user.id) === String(msg?.userId);
               const isMsgHost = msg?.userId === room.hostId;
               const senderName = msg?.userName || (isMe ? (user?.username || "You") : "Guest");

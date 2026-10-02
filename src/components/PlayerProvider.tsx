@@ -87,6 +87,8 @@ interface PlayerCtx {
   createRoom: () => Promise<void>;
   joinRoom: (code: string) => Promise<boolean>;
   leaveRoom: () => Promise<void>;
+  endRoom: () => Promise<void>;
+  transferHost: (newHostId: number | string) => Promise<boolean>;
 }
 
 const Ctx = createContext<PlayerCtx | null>(null);
@@ -896,6 +898,15 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     [user, toast, ensureGraph],
   );
 
+  const endRoom = useCallback(async () => {
+    const code = roomCodeRef.current;
+    setRoomCode(null);
+    setRoom(null);
+    roomRef.current = null;
+    if (code) await fetch(`/api/rooms/${code}?action=end`, { method: "DELETE" }).catch(() => {});
+    toast("Room ended");
+  }, [toast]);
+
   const leaveRoom = useCallback(async () => {
     const code = roomCodeRef.current;
     const wasGuest = lockedRef.current;
@@ -903,9 +914,34 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     setRoom(null);
     roomRef.current = null;
     if (wasGuest) audioRef.current?.pause();
-    if (code) await fetch(`/api/rooms/${code}`, { method: "DELETE" }).catch(() => {});
+    if (code) await fetch(`/api/rooms/${code}?action=leave`, { method: "DELETE" }).catch(() => {});
     toast("Left the room");
   }, [toast]);
+
+  const transferHost = useCallback(
+    async (newHostId: number | string) => {
+      const code = roomCodeRef.current;
+      if (!code) return false;
+      try {
+        const res = await fetch(`/api/rooms/${code}/transfer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newHostId }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.error || "Failed to transfer host", "err");
+          return false;
+        }
+        toast(`Host transferred to ${data.hostName}`);
+        return true;
+      } catch {
+        toast("Error transferring host", "err");
+        return false;
+      }
+    },
+    [toast],
+  );
 
   // poll the room
   useEffect(() => {
@@ -1343,6 +1379,8 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     createRoom,
     joinRoom,
     leaveRoom,
+    endRoom,
+    transferHost,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -39,4 +39,4 @@ class RoomChatManager {
 
 const globalForChat = globalThis as unknown as { roomChatManager?: RoomChatManager };
 export const roomChatManager = globalForChat.roomChatManager ?? new RoomChatManager();
-if (process.env.NODE_ENV !== "production") globalForChat.roomChatManager = roomChatManager;
+globalForChat.roomChatManager = roomChatManager;

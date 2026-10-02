@@ -43,8 +43,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
       (m: any) => now - new Date(m.lastSeen || 0).getTime() < 30_000
     );
 
-    // Save active members back so all users see current presence
-    await firebaseDb.saveRoom(code, { members: activeMembers });
+    let hostId = room.hostId;
+    let hostName = room.hostName ?? "host";
+
+    // If current host has disconnected and is no longer active, reassign to a random active listener
+    if (activeMembers.length > 0 && !activeMembers.some((m: any) => String(m.userId) === String(hostId))) {
+      const randomMember = activeMembers[Math.floor(Math.random() * activeMembers.length)];
+      hostId = randomMember.userId;
+      hostName = randomMember.name;
+      roomChatManager.addMessage(code, {
+        userId: "system",
+        userName: "System",
+        text: `Previous host disconnected. ${hostName} is now the host.`,
+      });
+    }
+
+    // Save active members and current host back so all users see current presence
+    await firebaseDb.saveRoom(code, { hostId, hostName, members: activeMembers });
 
     const members = activeMembers.map((m: any) => ({
       userId: Number(m.userId),
@@ -54,9 +69,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
 
     const info: RoomInfo = {
       code,
-      hostId: room.hostId,
-      hostName: room.hostName ?? "host",
-      isHost: String(room.hostId) === String(u.id),
+      hostId,
+      hostName,
+      isHost: String(hostId) === String(u.id),
       members,
       messages: roomChatManager.getMessages(code),
       state: room.state || null,
@@ -92,20 +107,53 @@ export async function PUT(req: Request, ctx: { params: Promise<{ code: string }>
   }
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ code: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ code: string }> }) {
   try {
     const u = await requireUser();
     const code = (await ctx.params).code.toUpperCase();
     const room = await firebaseDb.getRoom(code);
     if (!room) return Response.json({ ok: true });
-    if (String(room.hostId) === String(u.id)) {
+
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action") || "leave";
+    const isHost = String(room.hostId) === String(u.id);
+
+    if (action === "end") {
+      if (!isHost) throw new HttpError(403, "Only the host can end the room");
       await firebaseDb.deleteRoom(code);
       roomChatManager.deleteRoomChat(code);
-    } else {
-      const rawMembers = Array.isArray(room.members) ? room.members : [];
-      const updatedMembers = rawMembers.filter((m: any) => String(m.userId) !== String(u.id));
-      await firebaseDb.saveRoom(code, { members: updatedMembers });
+      return Response.json({ ok: true, ended: true });
     }
+
+    // User is leaving the room (action === "leave")
+    const rawMembers: any[] = Array.isArray(room.members) ? room.members : [];
+    const remainingMembers = rawMembers.filter((m: any) => String(m.userId) !== String(u.id));
+
+    if (remainingMembers.length === 0) {
+      // If nobody is left, delete room and clear chats
+      await firebaseDb.deleteRoom(code);
+      roomChatManager.deleteRoomChat(code);
+      return Response.json({ ok: true, ended: true });
+    }
+
+    if (isHost) {
+      // Host left without ending the room -> reassign host randomly among remaining listeners
+      const randomHost = remainingMembers[Math.floor(Math.random() * remainingMembers.length)];
+      await firebaseDb.saveRoom(code, {
+        hostId: randomHost.userId,
+        hostName: randomHost.name,
+        members: remainingMembers,
+      });
+      roomChatManager.addMessage(code, {
+        userId: "system",
+        userName: "System",
+        text: `${u.username} left the room. ${randomHost.name} is now the host.`,
+      });
+      return Response.json({ ok: true, transferredTo: randomHost.name });
+    }
+
+    // Regular listener left
+    await firebaseDb.saveRoom(code, { members: remainingMembers });
     return Response.json({ ok: true });
   } catch (e) {
     return errorResponse(e);
