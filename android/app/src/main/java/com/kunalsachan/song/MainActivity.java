@@ -9,8 +9,10 @@ import android.os.Bundle;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
 import android.widget.Toast;
+import androidx.activity.OnBackPressedCallback;
 import com.getcapacitor.BridgeActivity;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,6 +36,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     private PendingDownload pendingDownload = null;
+    private long lastBackPressedTime = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +62,7 @@ public class MainActivity extends BridgeActivity {
             }
         });
         setupDownloader();
+        setupBackNavigation();
         handleDeepLink(getIntent());
     }
 
@@ -83,6 +87,67 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+    }
+
+    private void setupBackNavigation() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    final WebView webView = getBridge().getWebView();
+                    webView.evaluateJavascript(
+                        "(function() {\n" +
+                        "  try {\n" +
+                        "    if (window.__handleAndroidBack && typeof window.__handleAndroidBack === 'function') {\n" +
+                        "      var handled = window.__handleAndroidBack();\n" +
+                        "      if (handled) return 'handled';\n" +
+                        "    }\n" +
+                        "  } catch (e) {}\n" +
+                        "  try {\n" +
+                        "    if (window.location && window.location.pathname !== '/') {\n" +
+                        "      if (window.history.length > 1) {\n" +
+                        "        window.history.back();\n" +
+                        "        return 'history_back';\n" +
+                        "      } else {\n" +
+                        "        window.location.href = '/';\n" +
+                        "        return 'goto_home';\n" +
+                        "      }\n" +
+                        "    }\n" +
+                        "  } catch (e) {}\n" +
+                        "  return 'none';\n" +
+                        "})();",
+                        new ValueCallback<String>() {
+                            @Override
+                            public void onReceiveValue(String value) {
+                                String result = value != null ? value.replace("\"", "").trim() : "";
+                                if ("handled".equals(result) || "history_back".equals(result) || "goto_home".equals(result)) {
+                                    return;
+                                }
+
+                                if (webView.canGoBack()) {
+                                    webView.goBack();
+                                    return;
+                                }
+
+                                if (System.currentTimeMillis() - lastBackPressedTime < 2000) {
+                                    finish();
+                                } else {
+                                    lastBackPressedTime = System.currentTimeMillis();
+                                    Toast.makeText(MainActivity.this, "Press back again to exit 5ONG", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+                    );
+                } else {
+                    if (System.currentTimeMillis() - lastBackPressedTime < 2000) {
+                        finish();
+                    } else {
+                        lastBackPressedTime = System.currentTimeMillis();
+                        Toast.makeText(MainActivity.this, "Press back again to exit 5ONG", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        });
     }
 
     public class DownloaderInterface {

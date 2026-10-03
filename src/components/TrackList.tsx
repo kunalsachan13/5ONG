@@ -22,6 +22,7 @@ import { usePlayer } from "@/components/PlayerProvider";
 import { Cover } from "@/components/ui";
 import { fmtTime } from "@/lib/eq";
 import type { Track } from "@/lib/types";
+import { registerBackHandler } from "@/lib/backHandler";
 
 export function TrackMenuButton({ track, onRemove, className = "" }: { track: Track; onRemove?: () => void; className?: string }) {
   const btn = useRef<HTMLButtonElement>(null);
@@ -57,6 +58,14 @@ export function TrackMenuButton({ track, onRemove, className = "" }: { track: Tr
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", esc);
     };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    return registerBackHandler(() => {
+      setOpen(false);
+      return true;
+    });
   }, [open]);
 
   const item = "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-lilac/30 dark:hover:bg-white/10 transition";

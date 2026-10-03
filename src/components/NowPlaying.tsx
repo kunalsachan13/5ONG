@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AudioLines,
   ChevronDown,
@@ -18,6 +18,7 @@ import { EmptyState, Cover } from "@/components/ui";
 import Visualizer from "@/components/Visualizer";
 import { TrackMenuButton } from "@/components/TrackList";
 import { EqualizerPanel, LyricsPanel, QueuePanel, RoomPanel } from "@/components/panels";
+import { registerBackHandler } from "@/lib/backHandler";
 
 const TABS: { id: Tab; label: string; Icon: typeof Disc3 }[] = [
   { id: "player", label: "Now Playing", Icon: Disc3 },
@@ -168,6 +169,15 @@ function PlayerTab() {
 
 export default function NowPlaying() {
   const { panel, setPanel } = usePlayer();
+
+  useEffect(() => {
+    if (!panel) return;
+    return registerBackHandler(() => {
+      setPanel(null);
+      return true;
+    });
+  }, [panel, setPanel]);
+
   if (!panel) return null;
   return (
     <div

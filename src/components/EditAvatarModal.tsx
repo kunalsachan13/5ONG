@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Camera, X, Upload, Trash2, Check, Sparkles, Image as ImageIcon } from "lucide-react";
 import { useApp } from "@/components/AppProvider";
+import { registerBackHandler } from "@/lib/backHandler";
 
 const PRESET_AVATARS = [
   "https://api.dicebear.com/7.x/bottts/svg?seed=Astra",
@@ -36,6 +37,14 @@ export function EditAvatarModal({
       setError(null);
     }
   }, [isOpen, user]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    return registerBackHandler(() => {
+      onClose();
+      return true;
+    });
+  }, [isOpen, onClose]);
 
   if (!isOpen || !user) return null;
 

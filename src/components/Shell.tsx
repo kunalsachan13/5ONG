@@ -36,6 +36,7 @@ import Logo from "@/components/Logo";
 import EditAvatarModal from "@/components/EditAvatarModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import AppSplashScreen from "@/components/AppSplashScreen";
+import { registerBackHandler } from "@/lib/backHandler";
 
 const NAV = [
   { href: "/", label: "Home", Icon: House },
@@ -103,6 +104,14 @@ function EditUsernameModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     }, 300);
     return () => clearTimeout(timer);
   }, [newUsername, user]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    return registerBackHandler(() => {
+      onClose();
+      return true;
+    });
+  }, [isOpen, onClose]);
 
   if (!isOpen || !user) return null;
 
@@ -217,6 +226,14 @@ function UserMenu() {
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    return registerBackHandler(() => {
+      setOpen(false);
+      return true;
+    });
+  }, [open]);
   if (!ready) return <div className="h-10 w-10 animate-pulse rounded-full bg-white/60 dark:bg-white/10" />;
   if (!user)
     return (
@@ -363,6 +380,15 @@ function Toasts() {
 
 function HelpModal() {
   const { helpOpen, setHelpOpen } = usePlayer();
+
+  useEffect(() => {
+    if (!helpOpen) return;
+    return registerBackHandler(() => {
+      setHelpOpen(false);
+      return true;
+    });
+  }, [helpOpen, setHelpOpen]);
+
   if (!helpOpen) return null;
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setHelpOpen(false)}>
@@ -583,6 +609,31 @@ function MobileNav() {
 
 export default function Shell({ children }: { children: ReactNode }) {
   const [sidebarHovered, setSidebarHovered] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    return registerBackHandler(() => {
+      if (
+        document.activeElement &&
+        (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")
+      ) {
+        (document.activeElement as HTMLElement).blur();
+        return true;
+      }
+
+      if (pathname && pathname !== "/") {
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          router.back();
+        } else {
+          router.push("/");
+        }
+        return true;
+      }
+
+      return false;
+    });
+  }, [pathname, router]);
 
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
