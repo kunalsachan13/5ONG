@@ -21,23 +21,29 @@ interface BIPEvent extends Event {
 export function DownloadAppButton({ className = "" }: { className?: string }) {
   const [bipEvent, setBipEvent] = useState<BIPEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"windows" | "android" | "ios">("windows");
-  const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    // Detect standalone PWA mode
-    const checkStandalone = () => {
+    // Detect standalone PWA mode or saved install state
+    const checkInstalled = () => {
       const standalone =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        window.matchMedia("(display-mode: window-controls-overlay)").matches ||
-        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-      setIsStandalone(Boolean(standalone));
+        Boolean(window.matchMedia("(display-mode: standalone)").matches) ||
+        Boolean(window.matchMedia("(display-mode: window-controls-overlay)").matches) ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+        document.referrer.includes("android-app://") ||
+        localStorage.getItem("5ong_pwa_installed") === "true";
+
+      if (standalone) {
+        setIsStandalone(true);
+        setIsInstalled(true);
+      }
     };
 
-    checkStandalone();
+    checkInstalled();
 
-    // Auto-detect OS
+    // Auto-detect OS for modal tab
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("android")) {
       setActiveTab("android");
@@ -65,11 +71,19 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
     };
 
     const onAppInstalled = () => {
-      setInstalled(true);
+      localStorage.setItem("5ong_pwa_installed", "true");
+      setIsInstalled(true);
+      setIsStandalone(true);
       setBipEvent(null);
       if (typeof window !== "undefined") {
         (window as unknown as { __deferredPrompt?: Event | null }).__deferredPrompt = null;
       }
+      setModalOpen(false);
+      window.dispatchEvent(new CustomEvent("5ong-app-installed"));
+    };
+
+    const onCustomInstalled = () => {
+      setIsInstalled(true);
       setIsStandalone(true);
       setModalOpen(false);
     };
@@ -79,12 +93,14 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
     window.addEventListener("beforeinstallprompt", onBIP);
     window.addEventListener("app-install-prompt-ready", onPromptReady);
     window.addEventListener("appinstalled", onAppInstalled);
+    window.addEventListener("5ong-app-installed", onCustomInstalled);
 
     return () => {
       window.removeEventListener("open-download-app-modal", onOpenModal);
       window.removeEventListener("beforeinstallprompt", onBIP);
       window.removeEventListener("app-install-prompt-ready", onPromptReady);
       window.removeEventListener("appinstalled", onAppInstalled);
+      window.removeEventListener("5ong-app-installed", onCustomInstalled);
     };
   }, []);
 
@@ -104,8 +120,11 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
           if (typeof window !== "undefined") {
             (window as unknown as { __deferredPrompt?: Event | null }).__deferredPrompt = null;
           }
-          setInstalled(true);
+          localStorage.setItem("5ong_pwa_installed", "true");
+          setIsInstalled(true);
+          setIsStandalone(true);
           setModalOpen(false);
+          window.dispatchEvent(new CustomEvent("5ong-app-installed"));
           return;
         }
       } catch (err) {
@@ -113,12 +132,12 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
       }
     }
 
-    // If browser prompt is not supported (e.g. iOS Safari, Firefox) or was dismissed, open the guide modal
+    // If browser prompt is not supported directly (e.g. iOS Safari) or was dismissed, open the guide modal
     setModalOpen(true);
   }, [bipEvent]);
 
-  // If already installed and running inside the standalone PWA window, don't show the download button
-  if (isStandalone || installed) {
+  // Once installed or running inside the standalone app, the button completely disappears
+  if (isStandalone || isInstalled) {
     return null;
   }
 
@@ -127,11 +146,11 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
       <div
         className={`inline-flex items-center rounded-full bg-gradient-to-r from-lilac to-pink dark:from-[#a855f7] dark:to-[#ec4899] p-0.5 shadow-xs hover:shadow-md transition-all ${className}`}
       >
-        {/* Direct 1-Click Install Button */}
+        {/* Direct Browser Install Button */}
         <button
           type="button"
           onClick={triggerDirectInstall}
-          title="Directly install 5ONG app on your device"
+          title="Install 5ONG app directly from browser"
           aria-label="Install 5ONG app"
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black text-ink dark:text-white hover:opacity-95 active:scale-95 transition cursor-pointer"
         >
@@ -143,7 +162,7 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          title="How to install / Installation instructions"
+          title="Installation instructions"
           aria-label="Installation instructions"
           className="grid h-7 w-7 place-items-center rounded-full text-ink/75 dark:text-white/80 hover:bg-black/10 dark:hover:bg-white/20 active:scale-90 transition cursor-pointer"
         >
@@ -151,7 +170,7 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
         </button>
       </div>
 
-      {/* Instructions / Direct Download Modal */}
+      {/* Direct Browser Install Modal */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
@@ -164,7 +183,7 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
             {/* Close Button */}
             <button
               onClick={() => setModalOpen(false)}
-              className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-black/5 dark:bg-white/10 text-muted hover:text-ink dark:hover:text-white transition"
+              className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-black/5 dark:bg-white/10 text-muted hover:text-ink dark:hover:text-white transition cursor-pointer"
               aria-label="Close dialog"
             >
               <X size={16} />
@@ -177,14 +196,14 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
               </div>
               <div>
                 <h3 className="text-lg font-black text-ink dark:text-white">Install 5ONG App</h3>
-                <p className="text-xs text-muted">Windows, Android & Mobile Web App</p>
+                <p className="text-xs text-muted">Direct browser installation</p>
               </div>
             </div>
 
             {/* Direct One-Click Button */}
             <div className="mb-5 rounded-2xl bg-lilac/20 dark:bg-purple-900/30 p-3.5 border border-lilac-deep/20 text-center">
               <p className="text-xs font-bold mb-2.5 text-ink dark:text-purple-200">
-                Click below to install directly on your device:
+                Click below to install directly to your device:
               </p>
               <button
                 type="button"
@@ -265,28 +284,12 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
 
               {activeTab === "android" && (
                 <>
-                  <div className="mb-2 p-3 rounded-2xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/25 text-center">
-                    <p className="text-xs font-bold mb-2 text-emerald-900 dark:text-emerald-200">
-                      Option 1: Direct Android APK package
-                    </p>
-                    <a
-                      href="/5ONG.apk"
-                      download="5ONG.apk"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-4 py-2 text-xs font-black shadow-sm transition hover:scale-[1.02] active:scale-[0.98] w-full"
-                    >
-                      <Download size={14} /> Download 5ONG APK (4.2 MB)
-                    </a>
-                  </div>
-
-                  <p className="text-[11px] font-bold text-muted px-1 mt-1">
-                    Option 2: Install as Web App (Chrome / Brave / Edge):
-                  </p>
                   <div className="flex items-start gap-2.5 p-2 rounded-xl bg-black/[0.02] dark:bg-white/[0.03]">
                     <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-lilac/30 dark:bg-purple-500/20 text-[11px] font-black text-lilac-deep dark:text-purple-300">
                       1
                     </span>
                     <p>
-                      In Chrome or Brave on Android, tap the <strong>three dots (⋮)</strong> menu in the top right.
+                      In Chrome, Brave, or Samsung Internet on Android, tap the <strong>three dots (⋮)</strong> menu in the top right.
                     </p>
                   </div>
                   <div className="flex items-start gap-2.5 p-2 rounded-xl bg-black/[0.02] dark:bg-white/[0.03]">
@@ -294,7 +297,7 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
                       2
                     </span>
                     <p>
-                      Tap <strong>&quot;Install app&quot;</strong> or <strong>&quot;Add to Home screen&quot;</strong>.
+                      Tap <strong>&quot;Install app&quot;</strong> (or <strong>&quot;Add to Home screen&quot;</strong>).
                     </p>
                   </div>
                   <div className="flex items-start gap-2.5 p-2 rounded-xl bg-black/[0.02] dark:bg-white/[0.03]">
@@ -302,7 +305,7 @@ export function DownloadAppButton({ className = "" }: { className?: string }) {
                       3
                     </span>
                     <p>
-                      Tap <strong>Install</strong> to add 5ONG directly to your app launcher with full-screen playback.
+                      Tap <strong>Install</strong>. 5ONG will be added to your home screen and app drawer with full standalone playback and lockscreen controls!
                     </p>
                   </div>
                 </>

@@ -232,7 +232,28 @@ function UserMenu({ onOpenAndroidSetup }: { onOpenAndroidSetup?: () => void }) {
   const [open, setOpen] = useState(false);
   const [editUsernameOpen, setEditUsernameOpen] = useState(false);
   const [editAvatarOpen, setEditAvatarOpen] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkInstalled = () => {
+      const standalone =
+        Boolean(typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches) ||
+        Boolean(typeof window !== "undefined" && window.matchMedia("(display-mode: window-controls-overlay)").matches) ||
+        (typeof navigator !== "undefined" && (navigator as unknown as { standalone?: boolean }).standalone === true) ||
+        (typeof localStorage !== "undefined" && localStorage.getItem("5ong_pwa_installed") === "true");
+      setIsInstalled(Boolean(standalone));
+    };
+    checkInstalled();
+    const onInstalled = () => setIsInstalled(true);
+    window.addEventListener("appinstalled", onInstalled);
+    window.addEventListener("5ong-app-installed", onInstalled);
+    return () => {
+      window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("5ong-app-installed", onInstalled);
+    };
+  }, []);
+
   useEffect(() => {
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", close);
@@ -332,17 +353,19 @@ function UserMenu({ onOpenAndroidSetup }: { onOpenAndroidSetup?: () => void }) {
             </div>
           </div>
           <div className="my-1 border-t border-ink/5 dark:border-white/10" />
-          <button
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left text-ink dark:text-white"
-            onClick={() => {
-              setOpen(false);
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(new CustomEvent("open-download-app-modal"));
-              }
-            }}
-          >
-            <Download size={16} className="text-lilac-deep dark:text-purple-300" /> Download & Install App
-          </button>
+          {!isInstalled && (
+            <button
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left text-ink dark:text-white"
+              onClick={() => {
+                setOpen(false);
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("open-download-app-modal"));
+                }
+              }}
+            >
+              <Download size={16} className="text-lilac-deep dark:text-purple-300" /> Download & Install App
+            </button>
+          )}
           <button
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left text-ink dark:text-white"
             onClick={() => {
