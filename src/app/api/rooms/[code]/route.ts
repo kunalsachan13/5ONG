@@ -54,7 +54,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
       if (String(newHostId) !== String(hostId)) {
         hostId = newHostId;
         hostName = newHostName;
-        roomChatManager.addMessage(code, {
+        await roomChatManager.addMessage(code, {
           userId: "system",
           userName: "System",
           text: `Previous host disconnected. ${hostName} is now the host.`,
@@ -71,13 +71,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
       avatarUrl: m.avatarUrl || null,
     }));
 
+    const messages = await roomChatManager.getMessages(code);
+
     const info: RoomInfo = {
       code,
       hostId,
       hostName,
       isHost: String(hostId) === String(u.id),
       members,
-      messages: roomChatManager.getMessages(code),
+      messages,
       state: room.state || null,
       updatedAt: room.stateUpdatedAt ? new Date(room.stateUpdatedAt).getTime() : Date.now(),
       serverNow: Date.now(),
@@ -125,7 +127,7 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ code: string
     if (action === "end") {
       if (!isHost) throw new HttpError(403, "Only the host can end the room");
       await firebaseDb.deleteRoom(code);
-      roomChatManager.deleteRoomChat(code);
+      await roomChatManager.deleteRoomChat(code);
       return Response.json({ ok: true, ended: true });
     }
 
@@ -136,7 +138,7 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ code: string
     if (remainingMembers.length === 0) {
       // If nobody is left, delete room and clear chats
       await firebaseDb.deleteRoom(code);
-      roomChatManager.deleteRoomChat(code);
+      await roomChatManager.deleteRoomChat(code);
       return Response.json({ ok: true, ended: true });
     }
 
@@ -148,7 +150,7 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ code: string
         hostName: randomHost.name,
         members: remainingMembers,
       });
-      roomChatManager.addMessage(code, {
+      await roomChatManager.addMessage(code, {
         userId: "system",
         userName: "System",
         text: `${u.username} left the room. ${randomHost.name} is now the host.`,

@@ -1,11 +1,55 @@
 import { getPreview } from "@/lib/deezer";
 import { resolveAudioStream } from "@/lib/audioResolver";
+import { tagM4a } from "@/lib/m4aMetadata";
+import { fetchRawLyrics } from "@/lib/lyricsFetcher";
 import NodeID3 from "node-id3";
 
 export const dynamic = "force-dynamic";
 
 function safe(s: string) {
   return s.replace(/[\\/:*?"<>|]+/g, "").trim() || "track";
+}
+
+async function resolveYouTubeAudioBuffer(videoId: string): Promise<Buffer | null> {
+  try {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const startRes = await fetch(
+      `https://p.savenow.to/ajax/download.php?format=mp3&url=${encodeURIComponent(url)}`,
+      {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!startRes.ok) return null;
+    const startData = (await startRes.json()) as any;
+    if (!startData?.success || !startData?.id) return null;
+
+    const jobId = startData.id;
+    const progressEndpoint = `https://p.savenow.to/api/progress?id=${encodeURIComponent(jobId)}`;
+
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 1200));
+      try {
+        const pRes = await fetch(progressEndpoint, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (!pRes.ok) continue;
+        const pData = (await pRes.json()) as any;
+        if (pData?.success === 1 && pData?.download_url) {
+          const audioRes = await fetch(pData.download_url, {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+            signal: AbortSignal.timeout(25000),
+          });
+          if (audioRes.ok) {
+            const ab = await audioRes.arrayBuffer();
+            return Buffer.from(ab);
+          }
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return null;
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -15,33 +59,41 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const artist = searchParams.get("artist") || "";
   const album = searchParams.get("album") || "";
   const coverUrl = searchParams.get("cover") || "";
+  const streamParam = searchParams.get("stream") || "";
+  const durationParam = searchParams.get("duration") || "";
   const wanted = Number(searchParams.get("quality") ?? 320);
 
   let targetTitle = title;
   let targetArtist = artist;
   let targetAlbum = album;
   let targetCover = coverUrl;
+  const targetDuration = Number(durationParam) || 0;
 
-  // If Deezer numeric id, get track metadata if title not supplied
-  if (!targetTitle && /^\d+$/.test(id)) {
+  // 1. Direct stream passed from active playback (non-YouTube)
+  let audioUrl = "";
+  if (streamParam && streamParam.startsWith("http") && !streamParam.includes("youtube.com") && !streamParam.includes("youtu.be")) {
+    audioUrl = streamParam;
+  }
+
+  // 2. If Deezer numeric id, get track metadata if title or cover not supplied
+  if ((!targetTitle || !targetCover) && /^\d+$/.test(id)) {
     const entry = await getPreview(id);
     if (entry?.meta) {
-      targetTitle = entry.meta.title_short || entry.meta.title || "";
-      targetArtist = entry.meta.artist?.name || "";
-      targetAlbum = entry.meta.album?.title || "";
-      targetCover = entry.meta.album?.cover_xl || entry.meta.album?.cover_medium || "";
+      if (!targetTitle) targetTitle = entry.meta.title_short || entry.meta.title || "";
+      if (!targetArtist) targetArtist = entry.meta.artist?.name || "";
+      if (!targetAlbum) targetAlbum = entry.meta.album?.title || "";
+      if (!targetCover) targetCover = entry.meta.album?.cover_xl || entry.meta.album?.cover_medium || "";
     }
   }
 
-  // 1. Resolve full-length 320kbps audio stream from JioSaavn CDN
-  let audioUrl = "";
-  if (targetTitle) {
+  // 3. Resolve full-length 320kbps audio stream from JioSaavn CDN
+  if (!audioUrl && targetTitle) {
     try {
       audioUrl = await resolveAudioStream(targetTitle, targetArtist);
     } catch (_) {}
   }
 
-  // 2. If not found and numeric ID, fallback to Deezer preview
+  // 4. If not found and numeric ID, fallback to Deezer preview
   if (!audioUrl && /^\d+$/.test(id)) {
     const entry = await getPreview(id);
     if (entry?.url) {
@@ -49,63 +101,188 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     }
   }
 
-  if (!audioUrl) {
+  let audioBuf: Buffer | null = null;
+
+  // 5. If audioUrl still not found, check if it's a YouTube track or resolve via YouTube
+  let ytVideoId = "";
+  if (id.startsWith("yt-") || id.startsWith("yt_")) {
+    ytVideoId = id.replace(/^yt[-_]/, "");
+  } else if (streamParam && (streamParam.includes("youtu.be/") || streamParam.includes("watch?v="))) {
+    const match = streamParam.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (match) ytVideoId = match[1];
+  }
+
+  if (!audioUrl && !ytVideoId && targetTitle) {
+    try {
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(targetTitle + " " + targetArtist + " official audio")}`;
+      const ytRes = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (ytRes.ok) {
+        const html = await ytRes.text();
+        const m = html.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
+        if (m && m[1]) {
+          ytVideoId = m[1];
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!audioUrl && ytVideoId) {
+    audioBuf = await resolveYouTubeAudioBuffer(ytVideoId);
+    if (audioBuf) {
+      audioUrl = "youtube-stream.mp3";
+      if (!targetCover) {
+        targetCover = `https://i.ytimg.com/vi/${ytVideoId}/maxresdefault.jpg`;
+      }
+    }
+  }
+
+  // 6. Fallback cover art search via iTunes Search API if cover is still missing
+  if (!targetCover && targetTitle) {
+    try {
+      const itunesRes = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(targetTitle + " " + targetArtist)}&entity=song&limit=1`,
+        { signal: AbortSignal.timeout(3000) }
+      );
+      if (itunesRes.ok) {
+        const j = await itunesRes.json();
+        const art = j.results?.[0]?.artworkUrl100;
+        if (art) {
+          targetCover = art.replace("100x100bb", "1000x1000bb");
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!audioUrl && !audioBuf) {
     return new Response("Audio stream not found", { status: 404 });
   }
 
   try {
-    const audioRes = await fetch(audioUrl, { cache: "no-store" });
-    if (!audioRes.ok) throw new Error("Failed to fetch upstream audio");
-    const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+    // Concurrently fetch audio (if not already downloaded), cover image, and lyrics for fastest response
+    const [audioRes, imgRes, lyricsData] = await Promise.all([
+      audioBuf ? Promise.resolve(null) : fetch(audioUrl, { cache: "no-store" }),
+      targetCover
+        ? fetch(targetCover, { signal: AbortSignal.timeout(4500) }).catch(() => null)
+        : Promise.resolve(null),
+      targetTitle
+        ? fetchRawLyrics(targetTitle, targetArtist, targetAlbum, targetDuration).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
-    let finalBuffer = audioBuf;
-
-    // Embed ID3 tags
-    try {
-      let imageBuffer: Buffer | undefined;
-      if (targetCover) {
-        try {
-          const imgRes = await fetch(targetCover, { signal: AbortSignal.timeout(4000) });
-          if (imgRes.ok) {
-            imageBuffer = Buffer.from(await imgRes.arrayBuffer());
-          }
-        } catch (_) {}
-      }
-
-      const tags = {
-        title: targetTitle || "Track",
-        artist: targetArtist || "Artist",
-        album: targetAlbum || "5ONG Single",
-        image: imageBuffer
-          ? {
-              mime: "image/jpeg",
-              type: { id: 3, name: "front cover" },
-              description: "Cover",
-              imageBuffer,
-            }
-          : undefined,
-      };
-
-      const tagged = NodeID3.write(tags, audioBuf as any);
-      if (tagged) {
-        finalBuffer = Buffer.from(tagged);
-      }
-    } catch (e) {
-      console.warn("ID3 tagging note:", e);
+    if (!audioBuf) {
+      if (!audioRes || !audioRes.ok) throw new Error("Failed to fetch upstream audio");
+      audioBuf = Buffer.from(await audioRes.arrayBuffer());
     }
 
-    const filename = `${safe(targetArtist || "Artist")} - ${safe(targetTitle || "Track")} [${wanted}k].mp3`;
+    let imageBuffer: Buffer | undefined;
+    if (imgRes && imgRes.ok) {
+      try {
+        imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+      } catch (_) {}
+    }
 
-    return new Response(finalBuffer, {
+    // Secondary cover fallback: If targetCover failed to download, search iTunes
+    if (!imageBuffer && targetTitle) {
+      try {
+        const itunesRes = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(targetTitle + " " + targetArtist)}&entity=song&limit=1`,
+          { signal: AbortSignal.timeout(3500) }
+        );
+        if (itunesRes.ok) {
+          const j = await itunesRes.json();
+          const art = j.results?.[0]?.artworkUrl100?.replace("100x100bb", "600x600bb");
+          if (art) {
+            const fallbackImgRes = await fetch(art, { signal: AbortSignal.timeout(3500) });
+            if (fallbackImgRes.ok) {
+              imageBuffer = Buffer.from(await fallbackImgRes.arrayBuffer());
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    const lyricsText = lyricsData?.syncedLyrics || lyricsData?.plainLyrics || "";
+
+    // Detect if upstream audio is MP4 / M4A container (standard for JioSaavn AAC streams)
+    const isMp4 =
+      (audioBuf.length > 8 &&
+        audioBuf[4] === 0x66 && // 'f'
+        audioBuf[5] === 0x74 && // 't'
+        audioBuf[6] === 0x79 && // 'y'
+        audioBuf[7] === 0x70) || // 'p'
+      audioUrl.includes(".mp4") ||
+      audioUrl.includes(".m4a");
+
+    let finalBuffer: Uint8Array = audioBuf;
+    const ext = isMp4 ? "m4a" : "mp3";
+
+    if (isMp4) {
+      // Clean MP4/M4A tagging via ISO BMFF atom manipulation:
+      // Injects metadata (Title, Artist, Album, Cover Art 'covr', Lyrics '©lyr')
+      // and recalculates stco/co64 chunk offsets so all media players read cover + lyrics cleanly.
+      try {
+        finalBuffer = tagM4a(audioBuf, {
+          title: targetTitle || "Track",
+          artist: targetArtist || "Artist",
+          album: targetAlbum || "5ONG Single",
+          cover: imageBuffer,
+          lyrics: lyricsText || undefined,
+        });
+      } catch (m4aErr) {
+        console.warn("M4A tagging warning:", m4aErr);
+        finalBuffer = audioBuf;
+      }
+    } else {
+      // MP3 tagging via standard ID3v2 tags (APIC for cover art, USLT for lyrics)
+      try {
+        const tags: NodeID3.Tags = {
+          title: targetTitle || "Track",
+          artist: targetArtist || "Artist",
+          album: targetAlbum || "5ONG Single",
+          image: imageBuffer
+            ? {
+                mime: "image/jpeg",
+                type: { id: 3, name: "front cover" },
+                description: "Cover",
+                imageBuffer,
+              }
+            : undefined,
+          unsynchronisedLyrics: lyricsText
+            ? {
+                language: "eng",
+                text: lyricsText,
+              }
+            : undefined,
+        };
+
+        const tagged = NodeID3.write(tags, audioBuf as any);
+        if (tagged) {
+          finalBuffer = Buffer.from(tagged);
+        }
+      } catch (e) {
+        console.warn("ID3 tagging warning:", e);
+      }
+    }
+
+    const filename = `${safe(targetArtist || "Artist")} - ${safe(targetTitle || "Track")} [${wanted}k].${ext}`;
+
+    return new Response(finalBuffer as any, {
       status: 200,
       headers: {
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="${filename.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         "Content-Length": String(finalBuffer.length),
         "Cache-Control": "no-store",
         "X-Requested-Bitrate": String(wanted),
         "X-Delivered-Bitrate": audioUrl.includes("preview") ? "128" : "320",
-        "Access-Control-Expose-Headers": "X-Requested-Bitrate, X-Delivered-Bitrate",
+        "X-Audio-Format": ext,
+        "Access-Control-Expose-Headers": "Content-Disposition, X-Requested-Bitrate, X-Delivered-Bitrate, X-Audio-Format",
       },
     });
   } catch (err: any) {

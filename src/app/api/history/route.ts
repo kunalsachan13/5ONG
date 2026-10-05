@@ -25,3 +25,13 @@ export async function POST(req: Request) {
     return errorResponse(e);
   }
 }
+
+export async function DELETE() {
+  try {
+    const u = await requireUser();
+    await firebaseDb.clearHistory(u.id);
+    return Response.json({ ok: true });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}

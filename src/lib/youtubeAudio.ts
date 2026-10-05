@@ -35,6 +35,8 @@ class YouTubeAudioService {
   private targetDivId = 'song-hidden-yt-player';
   private videoIdCache: Map<string, string> = new Map();
 
+  private _wasPlayingBeforeHidden = false;
+
   constructor() {
     if (typeof window !== 'undefined') {
       try {
@@ -46,6 +48,16 @@ class YouTubeAudioService {
         }
       } catch (_) {}
       this.initIframeApi();
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          if (this._isPlaying) {
+            this._wasPlayingBeforeHidden = true;
+          }
+        } else {
+          this._wasPlayingBeforeHidden = false;
+        }
+      });
     }
   }
 
@@ -84,14 +96,14 @@ class YouTubeAudioService {
       container = document.createElement('div');
       container.id = this.containerId;
       container.style.position = 'fixed';
-      container.style.bottom = '10px';
-      container.style.right = '10px';
-      container.style.width = '200px';
-      container.style.height = '200px';
+      container.style.bottom = '0px';
+      container.style.right = '0px';
+      container.style.width = '160px';
+      container.style.height = '160px';
       container.style.overflow = 'hidden';
-      container.style.opacity = '0.001';
+      container.style.opacity = '0.01';
       container.style.pointerEvents = 'none';
-      container.style.zIndex = '-9999';
+      container.style.zIndex = '1';
       document.body.appendChild(container);
     }
 
@@ -343,6 +355,7 @@ class YouTubeAudioService {
   }
 
   public pause() {
+    this._wasPlayingBeforeHidden = false;
     if (this.player && typeof this.player.pauseVideo === 'function') {
       try {
         this.player.pauseVideo();

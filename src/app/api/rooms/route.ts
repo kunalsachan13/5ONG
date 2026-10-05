@@ -1,4 +1,5 @@
 import { firebaseDb } from "@/lib/firebaseDb";
+import { roomChatManager } from "@/lib/roomChatStore";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -20,6 +21,15 @@ export async function POST(req: Request) {
         hostId: u.id,
         hostName: u.username,
         members: [{ userId: u.id, name: u.username, avatarUrl: u.avatarUrl || null, lastSeen: new Date().toISOString() }],
+        messages: [
+          {
+            id: `sys-${Date.now()}`,
+            userId: "system",
+            userName: "System",
+            text: "🎉 Room created! Share the code to listen together.",
+            timestamp: Date.now(),
+          },
+        ],
         state: null,
         createdAt: new Date().toISOString(),
       };
@@ -33,6 +43,11 @@ export async function POST(req: Request) {
       const members = Array.isArray(room.members) ? room.members.filter((m: any) => String(m.userId) !== String(u.id)) : [];
       members.push({ userId: u.id, name: u.username, avatarUrl: u.avatarUrl || null, lastSeen: new Date().toISOString() });
       await firebaseDb.saveRoom(code, { members });
+      await roomChatManager.addMessage(code, {
+        userId: "system",
+        userName: "System",
+        text: `👋 ${u.username} joined the room.`,
+      });
       return Response.json({ code });
     }
     throw new HttpError(400, "Unknown action");

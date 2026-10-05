@@ -1,3 +1,7 @@
+if (typeof window !== "undefined") {
+  throw new Error("Security Error: @/lib/auth cannot be imported on the client side.");
+}
+
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
@@ -20,22 +24,50 @@ export function toPublicUser(u: any): PublicUser {
   };
 }
 
-export async function createSession(userId: string | number, userMeta?: Partial<PublicUser>): Promise<string> {
-  const token = await new SignJWT({
+export function sanitizeSessionUser(u: any): Partial<PublicUser> {
+  if (!u) return {};
+  const avatar = u.avatarUrl ?? u.avatar_url ?? null;
+  // RFC 6265 cookie limit is 4096 bytes total. Never store large data URIs or long strings in cookies.
+  const safeAvatar =
+    typeof avatar === "string" && !avatar.startsWith("data:") && avatar.length <= 256
+      ? avatar
+      : null;
+
+  return {
+    id: u.id,
+    email: u.email || null,
+    username: u.username,
+    phoneNumber: u.phoneNumber || u.phone_number || null,
+    avatarUrl: safeAvatar,
+  };
+}
+
+export async function createSessionToken(userId: string | number, userMeta?: any): Promise<string> {
+  const safeMeta = userMeta ? sanitizeSessionUser(userMeta) : undefined;
+  return await new SignJWT({
     uid: String(userId),
-    user: userMeta ? { id: userId, ...userMeta } : undefined,
+    user: safeMeta,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
     .sign(secret);
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+}
+
+export async function createSession(userId: string | number, userMeta?: Partial<PublicUser>): Promise<string> {
+  const token = await createSessionToken(userId, userMeta);
+  try {
+    const jar = await cookies();
+    jar.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      secure: process.env.NODE_ENV === "production",
+    });
+  } catch {
+    // ignore
+  }
   return token;
 }
 

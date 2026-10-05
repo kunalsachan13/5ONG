@@ -7,12 +7,15 @@ import {
   Disc3,
   Download,
   Heart,
+  HardDrive,
   House,
   Library,
   ListMusic,
   LogIn,
   LogOut,
   Plus,
+  Play,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -26,6 +29,7 @@ import {
   Camera,
   Sun,
   Moon,
+  Smartphone,
 } from "lucide-react";
 import { useApp } from "@/components/AppProvider";
 import { usePlayer } from "@/components/PlayerProvider";
@@ -34,14 +38,21 @@ import PlayerBar from "@/components/PlayerBar";
 import NowPlaying from "@/components/NowPlaying";
 import Logo from "@/components/Logo";
 import EditAvatarModal from "@/components/EditAvatarModal";
+import AndroidSetupModal from "@/components/AndroidSetupModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import AppRefreshButton from "@/components/AppRefreshButton";
+import DownloadAppButton from "@/components/DownloadAppButton";
 import AppSplashScreen from "@/components/AppSplashScreen";
-import { registerBackHandler } from "@/lib/backHandler";
+import ExitConfirmModal from "@/components/ExitConfirmModal";
+import { registerBackHandler, executeBack } from "@/lib/backHandler";
+import { parseAndSaveAudioFiles } from "@/lib/localAudio";
+import type { Track } from "@/lib/types";
 
 const NAV = [
   { href: "/", label: "Home", Icon: House },
   { href: "/search", label: "Search", Icon: Search },
   { href: "/library", label: "Library", Icon: Library },
+  { href: "/library?tab=local", label: "Device Songs", Icon: HardDrive },
   { href: "/import", label: "Import", Icon: Link2 },
   { href: "/rooms", label: "Rooms", Icon: Users },
 ];
@@ -61,7 +72,8 @@ const SHORTCUTS: [string, string][] = [
   ["[ / ]", "Lyrics offset −0.1s / +0.1s"],
   ["0 – 9", "Jump to 0% – 90%"],
   ["/", "Focus search"],
-  ["Esc", "Close panels"],
+  ["F11", "Toggle full-screen (hide title bar)"],
+  ["Esc", "Close panels / exit full-screen"],
   ["?", "This help"],
 ];
 
@@ -214,9 +226,9 @@ function EditUsernameModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   );
 }
 
-function UserMenu() {
-  const { user, logout, ready } = useApp();
-  const { resolvedTheme, toggleTheme } = useTheme();
+function UserMenu({ onOpenAndroidSetup }: { onOpenAndroidSetup?: () => void }) {
+  const { user, logout, ready, clearDataAndCache } = useApp();
+  const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [editUsernameOpen, setEditUsernameOpen] = useState(false);
   const [editAvatarOpen, setEditAvatarOpen] = useState(false);
@@ -260,7 +272,7 @@ function UserMenu() {
         <span className="hidden max-w-24 truncate text-sm font-bold sm:block">{user.username}</span>
       </button>
       {open && (
-        <div className="pop-in glass absolute right-0 top-12 z-50 w-56 rounded-2xl p-1.5 shadow-xl" role="menu">
+        <div className="pop-in glass absolute right-0 top-12 z-50 w-60 rounded-2xl p-1.5 shadow-xl" role="menu">
           <div className="px-3 py-2 border-b border-ink/5 dark:border-white/10 mb-1">
             <p className="text-sm font-extrabold flex items-center gap-1.5">
               <span>@{user.username}</span>
@@ -288,19 +300,69 @@ function UserMenu() {
           <Link href="/library" className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition" onClick={() => setOpen(false)}>
             <Library size={16} /> Your library
           </Link>
-          <button
-            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left"
-            onClick={toggleTheme}
-          >
-            <span className="flex items-center gap-2">
-              {resolvedTheme === "dark" ? <Sun size={16} className="text-butter" /> : <Moon size={16} className="text-lilac-deep" />}
-              <span>Dark mode</span>
-            </span>
-            <span className="text-[11px] font-extrabold text-muted uppercase">
-              {resolvedTheme === "dark" ? "On" : "Off"}
-            </span>
-          </button>
+          <div className="my-1.5 px-3 py-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-muted mb-1.5 block">Theme</span>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-ink/5 dark:bg-white/5 p-1 border border-ink/5 dark:border-white/5">
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={`flex flex-col items-center gap-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  theme === "light"
+                    ? "bg-white text-ink shadow-xs"
+                    : "text-muted hover:text-ink dark:hover:text-white"
+                }`}
+                title="Light mode"
+              >
+                <Sun size={14} className={theme === "light" ? "text-amber-500" : ""} />
+                <span className="text-[10px]">Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`flex flex-col items-center gap-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  theme === "dark"
+                    ? "bg-white/20 text-white shadow-xs"
+                    : "text-muted hover:text-ink dark:hover:text-white"
+                }`}
+                title="Classic Dark mode"
+              >
+                <Moon size={14} className={theme === "dark" ? "text-butter" : ""} />
+                <span className="text-[10px]">Dark</span>
+              </button>
+            </div>
+          </div>
           <div className="my-1 border-t border-ink/5 dark:border-white/10" />
+          <button
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left text-ink dark:text-white"
+            onClick={() => {
+              setOpen(false);
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("open-download-app-modal"));
+              }
+            }}
+          >
+            <Download size={16} className="text-lilac-deep dark:text-purple-300" /> Download & Install App
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left text-ink dark:text-white"
+            onClick={() => {
+              setOpen(false);
+              onOpenAndroidSetup?.();
+            }}
+          >
+            <Smartphone size={16} className="text-emerald-500" /> Android Setup & Permissions
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-lilac/30 dark:hover:bg-white/10 transition text-left text-ink dark:text-white"
+            onClick={async () => {
+              if (window.confirm("Clear listening history, recommendation data, and temporary cache? (Your playlists and local songs will stay safe)")) {
+                setOpen(false);
+                await clearDataAndCache();
+              }
+            }}
+          >
+            <RotateCcw size={16} className="text-lilac-deep dark:text-purple-300" /> Clear data & cache
+          </button>
           <button
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition text-left"
             onClick={() => {
@@ -321,39 +383,168 @@ function UserMenu() {
 function SearchBox() {
   const router = useRouter();
   const path = usePathname();
+  const { playList } = usePlayer();
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (path !== "/search") setQ("");
+    setOpen(false);
   }, [path]);
+
+  useEffect(() => {
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setTracks([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search/autocomplete?q=${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+          setTracks(Array.isArray(data.tracks) ? data.tracks : []);
+        }
+      } catch (_) {}
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!wrapperRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const handleSelectQuery = (query: string) => {
+    setQ(query);
+    setOpen(false);
+    router.push(`/search?q=${encodeURIComponent(query)}`);
+  };
+
+  const handlePlayInstant = (track: Track) => {
+    setOpen(false);
+    playList([track], 0);
+  };
+
+  const hasResults = suggestions.length > 0 || tracks.length > 0;
+
   return (
-    <form
-      className="relative w-full"
-      role="search"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`);
-      }}
-    >
-      <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-      <input
-        id="global-search"
-        className="input !rounded-full !py-2 sm:!py-2.5 !pl-10 !pr-10 text-sm font-semibold w-full"
-        placeholder="Search songs, artists, albums…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        aria-label="Search"
-      />
-      {q && (
-        <button
-          type="button"
-          onClick={() => setQ("")}
-          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink dark:hover:text-white transition-colors"
-          aria-label="Clear search"
-        >
-          <X size={16} />
-        </button>
+    <div className="relative w-full" ref={wrapperRef}>
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (q.trim()) {
+            setOpen(false);
+            router.push(`/search?q=${encodeURIComponent(q.trim())}`);
+          }
+        }}
+      >
+        <Search size={16} className="pointer-events-none absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+        <input
+          id="global-search"
+          className="input !rounded-full !py-1.5 sm:!py-2.5 !pl-8.5 sm:!pl-10 !pr-8 sm:!pr-10 text-xs sm:text-sm font-semibold w-full"
+          placeholder="Search songs, artists…"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          aria-label="Search"
+          autoComplete="off"
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={() => {
+              setQ("");
+              setOpen(false);
+            }}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink dark:hover:text-white transition-colors"
+            aria-label="Clear search"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </form>
+
+      {/* Autocomplete Dropdown */}
+      {open && q.trim().length >= 2 && hasResults && (
+        <div className="absolute left-0 right-0 top-full mt-2 z-[80] overflow-hidden rounded-2xl bg-white/95 dark:bg-[#17102e]/95 backdrop-blur-xl border border-ink/10 dark:border-white/10 shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-150">
+          {/* Instant Songs */}
+          {tracks.length > 0 && (
+            <div className="mb-2">
+              <p className="px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-muted">
+                Instant Play
+              </p>
+              <div className="space-y-1">
+                {tracks.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handlePlayInstant(t)}
+                    className="flex w-full items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-lilac/25 dark:hover:bg-white/10 transition group cursor-pointer"
+                  >
+                    <img
+                      src={t.cover || "/logo.png"}
+                      alt={t.title}
+                      className="h-10 w-10 shrink-0 rounded-lg object-cover shadow-xs group-hover:scale-105 transition"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black text-ink dark:text-white group-hover:text-lilac-deep">
+                        {t.title}
+                      </p>
+                      <p className="truncate text-[11px] text-muted">{t.artist}</p>
+                    </div>
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-lilac/30 dark:bg-purple-900/40 text-lilac-deep dark:text-purple-300 opacity-0 group-hover:opacity-100 transition shadow-xs">
+                      <Play size={12} fill="currentColor" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Query Suggestions */}
+          {suggestions.length > 0 && (
+            <div>
+              {tracks.length > 0 && (
+                <div className="my-1 border-t border-ink/5 dark:border-white/10" />
+              )}
+              <p className="px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-muted">
+                Suggestions
+              </p>
+              <div className="space-y-0.5">
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectQuery(s)}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left text-xs font-bold text-ink/90 dark:text-white/90 hover:bg-lilac/20 dark:hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <Search size={14} className="text-muted shrink-0" />
+                    <span className="truncate">{s}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
-    </form>
+    </div>
   );
 }
 
@@ -432,12 +623,14 @@ function Sidebar({
     <aside
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={`hidden shrink-0 flex-col gap-1 p-3.5 md:flex transition-all duration-300 ease-in-out select-none border-r border-white/50 dark:border-white/10 bg-white/25 dark:bg-[#120d24]/60 backdrop-blur-md z-40 ${
+      className={`hidden shrink-0 flex-col gap-1 p-3.5 md:flex transition-all duration-300 ease-in-out select-none border-r border-white/50 dark:border-white/10 bg-white/25 dark:bg-[#120d24]/60 backdrop-blur-md z-40 app-sidebar ${
         isExpanded ? "w-64" : "w-[76px]"
       }`}
     >
-      <div className={`mb-4 flex items-center ${isExpanded ? "px-2 justify-between" : "justify-center"}`}>
-        <Logo size={36} showText={isExpanded} href="/" />
+      <div className={`mb-4 flex items-center titlebar-drag ${isExpanded ? "px-2 justify-between" : "justify-center"}`}>
+        <div className="titlebar-no-drag">
+          <Logo size={36} showText={isExpanded} href="/" />
+        </div>
       </div>
 
       <nav className="flex flex-col gap-1" aria-label="Main">
@@ -455,7 +648,10 @@ function Sidebar({
                 active ? "bg-white dark:bg-white/15 shadow-sm text-ink dark:text-white" : "text-muted hover:bg-white/60 dark:hover:bg-white/10 hover:text-ink dark:hover:text-white"
               }`}
             >
-              <Icon size={20} className={active ? "text-lilac-deep shrink-0" : "shrink-0"} />
+              <Icon
+                size={20}
+                className={active ? "text-lilac-deep shrink-0" : "shrink-0"}
+              />
               {isExpanded && <span className="truncate whitespace-nowrap animate-in fade-in duration-200">{label}</span>}
             </Link>
           );
@@ -537,6 +733,13 @@ function Sidebar({
           )}
         </button>
         {isExpanded && <InstallButton />}
+        {isExpanded && (
+          <div className="flex items-center gap-2 px-3.5 pt-1 text-[11px] text-muted">
+            <Link href="/privacy" className="hover:underline">Privacy</Link>
+            <span>•</span>
+            <Link href="/terms" className="hover:underline">Terms</Link>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -548,12 +751,25 @@ interface BIPEvent extends Event {
 function InstallButton() {
   const [evt, setEvt] = useState<BIPEvent | null>(null);
   useEffect(() => {
+    if (typeof window !== "undefined" && (window as unknown as { __deferredPrompt?: BIPEvent }).__deferredPrompt) {
+      setEvt((window as unknown as { __deferredPrompt?: BIPEvent }).__deferredPrompt || null);
+    }
     const h = (e: Event) => {
       e.preventDefault();
+      (window as unknown as { __deferredPrompt?: Event }).__deferredPrompt = e;
       setEvt(e as BIPEvent);
     };
+    const onReady = () => {
+      if (typeof window !== "undefined" && (window as unknown as { __deferredPrompt?: BIPEvent }).__deferredPrompt) {
+        setEvt((window as unknown as { __deferredPrompt?: BIPEvent }).__deferredPrompt || null);
+      }
+    };
     window.addEventListener("beforeinstallprompt", h);
-    return () => window.removeEventListener("beforeinstallprompt", h);
+    window.addEventListener("app-install-prompt-ready", onReady);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", h);
+      window.removeEventListener("app-install-prompt-ready", onReady);
+    };
   }, []);
   if (!evt) return null;
   return (
@@ -571,46 +787,123 @@ function InstallButton() {
 
 function MobileNav() {
   const path = usePathname();
-  const items = [...NAV.slice(0, 3), NAV[4]];
   const { setPanel, panel } = usePlayer();
+
   return (
     <nav
-      className="glass mx-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around rounded-3xl px-1.5 py-1.5 shadow-lg shadow-lilac/15 md:hidden"
+      className="mx-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around rounded-3xl px-1.5 py-1.5 shadow-2xl bg-white/95 dark:bg-[#120b22]/95 backdrop-blur-2xl border border-black/5 dark:border-white/10 md:hidden"
       aria-label="Main"
     >
-      {items.map(({ href, label, Icon }) => {
-        const active = href === "/" ? path === "/" : path.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={() => setPanel(null)}
-            className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
-              active && !panel ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
-            }`}
-          >
-            <Icon size={20} className={active && !panel ? "text-lilac-deep" : ""} />
-            {label}
-          </Link>
-        );
-      })}
-      <button
+      <Link
+        href="/"
+        onClick={() => setPanel(null)}
         className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
-          panel === "eq" ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
+          path === "/" && !panel ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
         }`}
-        onClick={() => setPanel(panel === "eq" ? null : "eq")}
       >
-        <SlidersHorizontal size={20} className={panel === "eq" ? "text-lilac-deep" : ""} />
-        EQ
+        <House size={20} className={path === "/" && !panel ? "text-lilac-deep" : ""} />
+        Home
+      </Link>
+      <Link
+        href="/library"
+        onClick={() => setPanel(null)}
+        className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
+          path.startsWith("/library") && !panel ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
+        }`}
+      >
+        <Library size={20} className={path.startsWith("/library") && !panel ? "text-lilac-deep" : ""} />
+        Library
+      </Link>
+      <Link
+        href="/rooms"
+        onClick={() => setPanel(null)}
+        className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
+          path.startsWith("/rooms") && !panel ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
+        }`}
+      >
+        <Users size={20} className={path.startsWith("/rooms") && !panel ? "text-lilac-deep" : ""} />
+        Rooms
+      </Link>
+      <button
+        onClick={() => setPanel(panel === "queue" ? null : "queue")}
+        className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
+          panel === "queue" ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
+        }`}
+      >
+        <ListMusic size={20} className={panel === "queue" ? "text-lilac-deep" : ""} />
+        Queue
       </button>
+      <Link
+        href="/import"
+        onClick={() => setPanel(null)}
+        className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl py-1 text-[11px] font-extrabold transition-transform active:scale-95 ${
+          path.startsWith("/import") && !panel ? "bg-white/80 dark:bg-white/15 text-ink dark:text-white shadow-xs" : "text-muted"
+        }`}
+      >
+        <Link2 size={20} className={path.startsWith("/import") && !panel ? "text-lilac-deep" : ""} />
+        Import
+      </Link>
     </nav>
   );
 }
 
 export default function Shell({ children }: { children: ReactNode }) {
   const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [showAndroidSetup, setShowAndroidSetup] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const { playTrack, panel } = usePlayer();
+  const { toast } = useApp();
+
+
+
+  // Android back button popstate interception to guarantee exit confirmation popup
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!window.history.state?.isSongApp) {
+      window.history.pushState({ isSongApp: true }, "");
+    }
+
+    const onPopState = () => {
+      const handled = executeBack();
+      if (handled) {
+        window.history.pushState({ isSongApp: true }, "");
+      } else {
+        setShowExitModal(true);
+        window.history.pushState({ isSongApp: true }, "");
+      }
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // PWA File Handling API: Play local audio files opened from Android File Manager
+  useEffect(() => {
+    if (typeof window !== "undefined" && "launchQueue" in window) {
+      (window as any).launchQueue.setConsumer(async (launchParams: any) => {
+        if (!launchParams?.files?.length) return;
+        try {
+          const files: File[] = [];
+          for (const handle of launchParams.files) {
+            const file = await handle.getFile();
+            files.push(file);
+          }
+          if (files.length > 0) {
+            const tracks = await parseAndSaveAudioFiles(files);
+            if (tracks.length > 0) {
+              playTrack(tracks[0]);
+              toast(`Playing ${tracks[0].title}`, "ok");
+            }
+          }
+        } catch (e) {
+          console.warn("Could not handle launched audio file:", e);
+        }
+      });
+    }
+  }, [playTrack, toast]);
 
   useEffect(() => {
     return registerBackHandler(() => {
@@ -631,18 +924,21 @@ export default function Shell({ children }: { children: ReactNode }) {
         return true;
       }
 
-      return false;
+      // Root path reached: Show Android exit confirmation modal!
+      setShowExitModal(true);
+      return true;
     });
   }, [pathname, router]);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+    if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="relative flex h-dvh overflow-hidden">
+
       <AppSplashScreen />
       <Sidebar
         isExpanded={sidebarHovered}
@@ -650,35 +946,62 @@ export default function Shell({ children }: { children: ReactNode }) {
         onMouseLeave={() => setSidebarHovered(false)}
       />
       <div
-        className="flex min-w-0 flex-1 flex-col transition-all duration-300"
+        className="relative z-10 flex min-w-0 flex-1 flex-col transition-all duration-300"
         onMouseEnter={() => setSidebarHovered(false)}
       >
-        <header className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 sm:flex-nowrap sm:gap-4 sm:px-6 md:px-8 md:py-4">
-          <div className="flex items-center gap-2">
-            <Logo className="md:hidden" size={32} />
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 px-3.5 pt-2.5 pb-1.5 sm:px-6 md:px-8 md:py-4 select-none titlebar-drag">
+          <div className="flex items-center justify-between w-full sm:w-auto">
+            <div className="flex items-center gap-2 titlebar-no-drag shrink-0">
+              <Logo className="md:hidden" size={32} />
+            </div>
+            <div className="flex sm:hidden items-center gap-1.5 shrink-0 titlebar-no-drag">
+              <DownloadAppButton />
+              <ThemeToggle />
+              <UserMenu onOpenAndroidSetup={() => setShowAndroidSetup(true)} />
+            </div>
           </div>
-          <div className="order-3 w-full sm:order-2 sm:flex-1 sm:max-w-md min-w-0">
+          <div className="w-full sm:flex-1 sm:max-w-xl sm:mx-2 min-w-0 titlebar-no-drag">
             <SearchBox />
           </div>
-          <div className="order-2 sm:order-3 flex items-center gap-2 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0 titlebar-no-drag">
+            <DownloadAppButton />
+            <AppRefreshButton />
             <ThemeToggle />
-            <UserMenu />
+            <UserMenu onOpenAndroidSetup={() => setShowAndroidSetup(true)} />
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-44 sm:px-6 md:px-8 md:pb-28">
+        <main className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-56 sm:px-6 md:px-8 md:pb-28">
           {children}
         </main>
       </div>
       <NowPlaying />
-      <div
-        className={`fixed inset-x-0 bottom-0 z-50 transition-[left] duration-300 ease-in-out ${
-          sidebarHovered ? "md:left-64" : "md:left-[76px]"
-        }`}
-      >
-        <PlayerBar />
-        <MobileNav />
-      </div>
+      {!panel && (
+        <div
+          className={`fixed inset-x-0 bottom-0 z-50 transition-[left] duration-300 ease-in-out ${
+            sidebarHovered ? "md:left-64" : "md:left-[76px]"
+          }`}
+        >
+          <PlayerBar />
+          <MobileNav />
+        </div>
+      )}
       <HelpModal />
+      <ExitConfirmModal
+        isOpen={showExitModal}
+        onCancel={() => setShowExitModal(false)}
+        onConfirmExit={() => {
+          setShowExitModal(false);
+          if (typeof window !== "undefined") {
+            window.close();
+            // Fallback for browsers that block window.close():
+            window.location.href = "about:blank";
+          }
+        }}
+      />
+      <AndroidSetupModal
+        forceOpen={showAndroidSetup}
+        onClose={() => setShowAndroidSetup(false)}
+      />
       <Toasts />
     </div>
   );

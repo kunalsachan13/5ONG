@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { firebaseDb } from "@/lib/firebaseDb";
 import { createSession, getOrigin, toPublicUser, uniqueUsernameBase } from "@/lib/auth";
@@ -15,38 +16,12 @@ export async function GET(req: Request) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const origin = getOrigin(req);
   if (!clientId || !clientSecret) {
-    return Response.redirect(`${origin}/login?error=google_not_configured`, 302);
+    return NextResponse.redirect(new URL("/login?error=google_not_configured", origin), 302);
   }
   const stateRandom = crypto.randomBytes(16).toString("hex");
   // Encode platform & port into state so it roundtrips through Google even if third-party cookies are blocked
   const state = platform ? `${stateRandom}:${platform}:${desktopPort || "0"}` : stateRandom;
   
-  const jar = await cookies();
-  jar.set("5ong_oauth_state", stateRandom, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 600,
-    secure: origin.startsWith("https"),
-  });
-  if (platform) {
-    jar.set("5ong_oauth_platform", platform, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600,
-      secure: origin.startsWith("https"),
-    });
-  }
-  if (desktopPort) {
-    jar.set("5ong_oauth_desktop_port", desktopPort, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600,
-      secure: origin.startsWith("https"),
-    });
-  }
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${origin}/api/auth/google/callback`,
@@ -55,7 +30,36 @@ export async function GET(req: Request) {
     state,
     prompt: "select_account",
   });
-  return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, 302);
+
+  const redirectRes = NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, 302);
+  
+  redirectRes.cookies.set("5ong_oauth_state", stateRandom, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600,
+    secure: origin.startsWith("https"),
+  });
+  if (platform) {
+    redirectRes.cookies.set("5ong_oauth_platform", platform, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+      secure: origin.startsWith("https"),
+    });
+  }
+  if (desktopPort) {
+    redirectRes.cookies.set("5ong_oauth_desktop_port", desktopPort, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+      secure: origin.startsWith("https"),
+    });
+  }
+
+  return redirectRes;
 }
 
 // POST /api/auth/google -> Handles direct token/credential verification from JF Player Google One Tap / SDK
@@ -126,10 +130,11 @@ export async function POST(req: Request) {
     if (!u) {
       const existingByEmail = await firebaseDb.getUserByEmail(googleUser.email);
       if (existingByEmail) {
-        u = await firebaseDb.updateUser(existingByEmail.id, {
+        const updated = await firebaseDb.updateUser(existingByEmail.id, {
           googleId: googleUser.googleId,
           avatarUrl: existingByEmail.avatarUrl ?? googleUser.avatar ?? null,
         });
+        u = { ...existingByEmail, ...updated };
       }
     }
     if (!u) {

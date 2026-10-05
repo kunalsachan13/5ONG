@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
+import { NextResponse } from "next/server";
 import { firebaseDb } from "@/lib/firebaseDb";
-import { createSession, errorResponse, HttpError, rateLimit, toPublicUser } from "@/lib/auth";
+import { createSession, errorResponse, HttpError, rateLimit, SESSION_COOKIE, toPublicUser } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -62,8 +63,16 @@ export async function POST(req: Request) {
       phoneNumber: phone || null,
       passwordHash,
     });
-    await createSession(u.id, u);
-    return Response.json({ user: toPublicUser(u) });
+    const sessionToken = await createSession(u.id, u);
+    const res = NextResponse.json({ user: toPublicUser(u) });
+    res.cookies.set(SESSION_COOKIE, sessionToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      secure: process.env.NODE_ENV === "production",
+    });
+    return res;
   } catch (e) {
     return errorResponse(e);
   }

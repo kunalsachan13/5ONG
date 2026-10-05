@@ -11,10 +11,13 @@ import {
   type ReactNode,
 } from "react";
 import { useApp } from "@/components/AppProvider";
+import { useTheme } from "@/components/ThemeProvider";
 import { EQ_BANDS, EQ_PRESETS } from "@/lib/eq";
 import { buildAffinity, fisherYates, smartShuffle } from "@/lib/smartShuffle";
 import { resolveAudioStream } from "@/lib/audioResolver";
 import { youtubeAudio } from "@/lib/youtubeAudio";
+import { getLocalTrackAudioUrl } from "@/lib/localAudio";
+import { extractThemeFromCover, type TrackTheme } from "@/lib/colorExtractor";
 import type { RoomInfo, Track } from "@/lib/types";
 
 export type ShuffleMode = "off" | "on" | "smart";
@@ -30,6 +33,7 @@ export interface EqState {
 
 interface PlayerCtx {
   current: Track | null;
+  trackTheme: TrackTheme | null;
   queue: Track[];
   index: number;
   playing: boolean;
@@ -49,7 +53,7 @@ interface PlayerCtx {
   room: RoomInfo | null;
   roomCode: string | null;
   locked: boolean;
-  setRoom: (r: RoomInfo | null) => void;
+  setRoom: React.Dispatch<React.SetStateAction<RoomInfo | null>>;
   setPanel: (p: Tab | null) => void;
   setHelpOpen: (v: boolean) => void;
   setVizMode: (m: VizMode) => void;
@@ -101,11 +105,60 @@ export function usePlayer() {
 const SETTINGS_KEY = "5ong.settings.v1";
 const OFFSETS_KEY = "5ong.lyricOffsets.v1";
 const ROOM_KEY = "5ong.room.v1";
+const LAST_TRACK_KEY = "5ong.lastTrack.v2";
+
+interface LastTrackState {
+  track: Track;
+  queue: Track[];
+  index: number;
+  position: number;
+  duration: number;
+  sourceType: "saavn" | "youtube" | "deezer" | null;
+  timestamp: number;
+}
+
 const DEFAULT_EQ: EqState = { enabled: true, preamp: 0, gains: EQ_PRESETS.Flat.slice(), preset: "Flat" };
 const VIZ_ORDER: VizMode[] = ["bars", "wave", "orbit", "mirror"];
 
+function createKeepaliveAudioUrl(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const sampleRate = 8000;
+    const duration = 2;
+    const numSamples = sampleRate * duration;
+    const buffer = new ArrayBuffer(44 + numSamples);
+    const view = new DataView(buffer);
+
+    view.setUint32(0, 0x52494646, false); // 'RIFF'
+    view.setUint32(4, 36 + numSamples, true);
+    view.setUint32(8, 0x57415645, false); // 'WAVE'
+    view.setUint32(12, 0x666d7420, false); // 'fmt '
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate, true);
+    view.setUint16(32, 1, true);
+    view.setUint16(34, 8, true);
+    view.setUint32(36, 0x64617461, false); // 'data'
+    view.setUint32(40, numSamples, true);
+
+    for (let i = 0; i < numSamples; i++) {
+      const val = Math.round(128 + 120 * Math.sin((2 * Math.PI * 20 * i) / sampleRate));
+      view.setUint8(44 + i, Math.max(0, Math.min(255, val)));
+    }
+
+    const blob = new Blob([buffer], { type: "audio/wav" });
+    return URL.createObjectURL(blob);
+  } catch {
+    return "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+  }
+}
+
 export default function PlayerProvider({ children }: { children: ReactNode }) {
   const { toast, logPlay, toggleLike, likes, history, user } = useApp();
+  const keepaliveUrlRef = useRef<string>("");
+  const keepaliveAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const acRef = useRef<AudioContext | null>(null);
@@ -137,6 +190,8 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [sourceType, setSourceType] = useState<"saavn" | "youtube" | "deezer" | null>(null);
+  const sourceTypeRef = useRef(sourceType);
+  sourceTypeRef.current = sourceType;
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [sleepTimer, setSleepTimerState] = useState<number | null>(null);
   const sleepTimerIdRef = useRef<any>(null);
@@ -161,6 +216,9 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   const current = index >= 0 ? (queue[index] ?? null) : null;
   const currentRef = useRef<Track | null>(null);
   currentRef.current = current;
+  const playingRef = useRef(false);
+  playingRef.current = playing;
+  const userPausedRef = useRef(false);
   const locked = Boolean(room && !room.isHost);
   const lockedRef = useRef(false);
   lockedRef.current = locked;
@@ -173,6 +231,39 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   const affinity = useMemo(() => buildAffinity(likes, history), [likes, history]);
   const affinityRef = useRef(affinity);
   affinityRef.current = affinity;
+
+  const [trackTheme, setTrackTheme] = useState<TrackTheme | null>(null);
+
+  useEffect(() => {
+    if (!current) {
+      setTrackTheme(null);
+      return;
+    }
+    let alive = true;
+    extractThemeFromCover(current.coverBig || current.cover, `${current.title}_${current.artist}`).then((th) => {
+      if (alive) setTrackTheme(th);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [current?.id, current?.cover, current?.coverBig, current?.title, current?.artist]);
+
+  // Clean up any residual CSS custom properties on documentElement
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.style.removeProperty("--color-lilac-deep");
+    root.style.removeProperty("--color-lilac");
+    root.style.removeProperty("--color-pink-deep");
+    root.style.removeProperty("--color-pink");
+    root.style.removeProperty("--theme-primary");
+    root.style.removeProperty("--theme-accent");
+    root.style.removeProperty("--theme-glow");
+    root.style.removeProperty("--theme-bg-start");
+    root.style.removeProperty("--theme-bg-end");
+    root.style.removeProperty("--theme-button-bg");
+    root.style.removeProperty("--theme-button-text");
+  }, []);
 
   /* ---------------------------------- settings ---------------------------------- */
   useEffect(() => {
@@ -249,11 +340,17 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const ensureGraph = useCallback(() => {
+  const ensureGraph = useCallback((force = false) => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.crossOrigin !== "anonymous") {
       audio.crossOrigin = "anonymous";
+    }
+    // On Android and mobile devices, routing HTML5 audio into Web Audio AudioContext causes
+    // background audio playback to stop when the app is minimized because Chrome/OS suspends AudioContext.
+    // Keep native audio streaming directly unless EQ is explicitly enabled.
+    if (!force && !eqRef.current?.enabled) {
+      return;
     }
     if (acRef.current) {
       if (acRef.current.state === "suspended") acRef.current.resume().catch(() => {});
@@ -286,6 +383,11 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       }
       node.connect(analyser);
       analyser.connect(ctx.destination);
+      ctx.onstatechange = () => {
+        if (ctx.state === "suspended" && playingRef.current && !userPausedRef.current) {
+          ctx.resume().catch(() => {});
+        }
+      };
       acRef.current = ctx;
       filtersRef.current = filters;
       preampRef.current = pre;
@@ -298,17 +400,48 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   }, [applyEq]);
 
   useEffect(() => {
+    if (eq.enabled) {
+      ensureGraph(true);
+    }
     applyEq(eq);
-  }, [eq, applyEq]);
+  }, [eq, applyEq, ensureGraph]);
 
-  const getAnalyser = useCallback(() => analyserRef.current, []);
+  const getAnalyser = useCallback(() => {
+    if (!acRef.current && typeof window !== "undefined") {
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator?.userAgent || "");
+      if (!isMobile) {
+        ensureGraph(true);
+      }
+    }
+    return analyserRef.current;
+  }, [ensureGraph]);
 
   /* ---------------------------------- playback ---------------------------------- */
   const playViaYouTube = useCallback(async (t: Track, autoplay = true, startAt = 0): Promise<boolean> => {
     const a = audioRef.current;
     if (a) {
-      a.pause();
-      a.src = "";
+      try {
+        a.pause();
+        a.removeAttribute("src");
+        a.load();
+      } catch (_) {}
+    }
+
+    if (typeof Audio !== "undefined") {
+      try {
+        if (!keepaliveAudioRef.current) {
+          if (!keepaliveUrlRef.current) {
+            keepaliveUrlRef.current = createKeepaliveAudioUrl();
+          }
+          const ka = new Audio(keepaliveUrlRef.current);
+          ka.loop = true;
+          ka.volume = 0.05;
+          keepaliveAudioRef.current = ka;
+        }
+        if (autoplay && keepaliveAudioRef.current) {
+          keepaliveAudioRef.current.play().catch(() => {});
+        }
+      } catch (_) {}
     }
     setLoading(true);
     let vid: string | null = null;
@@ -345,6 +478,7 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       const a = audioRef.current;
       if (!a) return;
       const { autoplay = true, startAt = 0 } = opts;
+      userPausedRef.current = !autoplay;
       ensureGraph();
       pendingStart.current = startAt;
       loggedRef.current = false;
@@ -356,13 +490,57 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       if (youtubeAudio.isPlaying || youtubeAudio.activeVideoId) {
         youtubeAudio.stop();
       }
+      if (keepaliveAudioRef.current) {
+        try {
+          keepaliveAudioRef.current.pause();
+        } catch (_) {}
+      }
 
       let directSuccess = false;
       const targetVol = typeof volumeRef.current === "number" && !isNaN(volumeRef.current) ? Math.max(0, Math.min(1, volumeRef.current)) : 0.85;
       const targetMuted = Boolean(mutedRef.current);
 
+      // 0. Local file playback (Phone/Device audio or blob URLs)
+      const isLocal = t.source === "local" || t.id.startsWith("local_") || (t.audioUrl && t.audioUrl.startsWith("blob:"));
+      if (isLocal) {
+        youtubeAudio.stop();
+        let streamUrl = t.audioUrl || t.streamUrl;
+        if ((!streamUrl || !streamUrl.startsWith("blob:")) && t.id.startsWith("local_")) {
+          streamUrl = (await getLocalTrackAudioUrl(t.id)) || undefined;
+        }
+
+        if (streamUrl) {
+          a.removeAttribute("crossorigin");
+          a.src = streamUrl;
+          a.volume = targetVol;
+          a.muted = targetMuted;
+          a.playbackRate = playbackRate;
+          setSourceType(null);
+          if (autoplay) {
+            try {
+              if (acRef.current?.state === "suspended") acRef.current.resume().catch(() => {});
+              await a.play();
+              a.volume = targetVol;
+              a.muted = targetMuted;
+              setPlaying(true);
+              directSuccess = true;
+            } catch (err: any) {
+              if (err?.name !== "AbortError") {
+                console.warn("Local audio playback note:", err);
+              }
+            }
+          } else {
+            setPlaying(false);
+            setLoading(false);
+            if (startAt > 0) a.currentTime = startAt;
+            directSuccess = true;
+          }
+        }
+      }
+
       // 1. Primary: Resolve direct JioSaavn 320kbps verified audio CDN stream
-      try {
+      if (!directSuccess) {
+        try {
         let streamUrl = t.audioUrl || t.streamUrl;
         if (!streamUrl || streamUrl.includes("preview") || streamUrl.includes("itunes")) {
           streamUrl = await resolveAudioStream(t.title, t.artist);
@@ -389,10 +567,16 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
               }
             }
           } else {
+            setPlaying(false);
+            setLoading(false);
+            if (startAt > 0) {
+              a.currentTime = startAt;
+            }
             directSuccess = true;
           }
         }
       } catch (_) {}
+      }
 
       // 2. If direct 320k stream was unavailable or failed, stream the FULL song via YouTube engine!
       if (!directSuccess) {
@@ -408,6 +592,9 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
             a.play().catch((err) => {
               if (err?.name !== "AbortError") setPlaying(false);
             });
+          } else {
+            setPlaying(false);
+            setLoading(false);
           }
         }
       }
@@ -415,10 +602,122 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     [ensureGraph, playbackRate, playViaYouTube],
   );
 
+  const lastSaveTimeRef = useRef(0);
+
+  const saveLastTrackState = useCallback(() => {
+    const cur = currentRef.current;
+    if (!cur) return;
+    const a = audioRef.current;
+    const pos =
+      sourceType === "youtube"
+        ? Math.floor(youtubeAudio.getCurrentTime())
+        : Math.floor(a?.currentTime || position || 0);
+    const dur =
+      sourceType === "youtube"
+        ? Math.floor(youtubeAudio.getDuration())
+        : Math.floor(a?.duration || duration || cur.duration || 0);
+
+    const q = queueRef.current;
+    const idx = indexRef.current;
+    const startIdx = Math.max(0, idx - 10);
+    const endIdx = idx + 40;
+    const slicedQ = q.slice(startIdx, endIdx);
+    const newIdx = Math.max(0, idx - startIdx);
+
+    const state: LastTrackState = {
+      track: cur,
+      queue: slicedQ.length > 0 ? slicedQ : [cur],
+      index: newIdx,
+      position: Math.max(0, pos),
+      duration: Math.max(0, dur),
+      sourceType,
+      timestamp: Date.now(),
+    };
+
+    try {
+      localStorage.setItem(LAST_TRACK_KEY, JSON.stringify(state));
+    } catch {
+      /* ignore */
+    }
+  }, [sourceType, position, duration]);
+
+  // Restore the last played track and position on app launch
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current || !settingsLoaded) return;
+    restoredRef.current = true;
+    try {
+      const lastStateStr = localStorage.getItem(LAST_TRACK_KEY);
+      if (!lastStateStr) return;
+      const last = JSON.parse(lastStateStr) as LastTrackState;
+      if (last && last.track && last.track.id) {
+        const q = Array.isArray(last.queue) && last.queue.length > 0 ? last.queue : [last.track];
+        const idx = typeof last.index === "number" && last.index >= 0 && last.index < q.length ? last.index : 0;
+        const pos = typeof last.position === "number" && last.position > 0 ? last.position : 0;
+        const dur = typeof last.duration === "number" && last.duration > 0 ? last.duration : (last.track.duration || 0);
+
+        queueRef.current = q;
+        indexRef.current = idx;
+        setQueue(q);
+        setIndex(idx);
+        setPosition(pos);
+        setDuration(dur);
+
+        // Preload/cue track at the exact position where user left from without auto-playing
+        void loadTrack(last.track, { autoplay: false, startAt: pos });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [settingsLoaded, loadTrack]);
+
+  // Save last track on tab close, page hide, navigation, or visibility change
+  useEffect(() => {
+    const onExit = () => {
+      saveLastTrackState();
+    };
+    window.addEventListener("beforeunload", onExit);
+    window.addEventListener("pagehide", onExit);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        saveLastTrackState();
+        if (playingRef.current && !userPausedRef.current) {
+          const a = audioRef.current;
+          if (a && a.src && a.paused) {
+            a.play().catch(() => {});
+          }
+          if (acRef.current && acRef.current.state === "suspended") {
+            acRef.current.resume().catch(() => {});
+          }
+        }
+      } else {
+        if (playingRef.current && !userPausedRef.current) {
+          const a = audioRef.current;
+          if (a && a.src && a.paused) {
+            a.play().catch(() => {});
+          }
+          if (acRef.current && acRef.current.state === "suspended") {
+            acRef.current.resume().catch(() => {});
+          }
+          if (sourceTypeRef.current === "youtube") {
+            youtubeAudio.resume();
+          }
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", onExit);
+      window.removeEventListener("pagehide", onExit);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [saveLastTrackState]);
+
   const playIndex = useCallback(
     (i: number) => {
       const t = queueRef.current[i];
       if (!t) return;
+      userPausedRef.current = false;
       if (acRef.current?.state === "suspended") {
         acRef.current.resume().catch(() => {});
       }
@@ -506,6 +805,7 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
   const playList = useCallback(
     (tracks: Track[], start = 0) => {
       if (blocked() || !tracks.length) return;
+      userPausedRef.current = false;
       if (acRef.current?.state === "suspended") {
         acRef.current.resume().catch(() => {});
       }
@@ -577,32 +877,6 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     [blocked, playList],
   );
 
-  const toggle = useCallback(() => {
-    if (blocked() || !currentRef.current) return;
-    ensureGraph();
-    if (acRef.current?.state === "suspended") {
-      acRef.current.resume().catch(() => {});
-    }
-    if (sourceType === "youtube" || (!audioRef.current?.src && youtubeAudio.activeVideoId)) {
-      if (youtubeAudio.isPlaying) youtubeAudio.pause();
-      else youtubeAudio.resume();
-    } else {
-      const a = audioRef.current;
-      if (!a) return;
-      if (a.paused) a.play().catch(() => {});
-      else a.pause();
-    }
-  }, [blocked, ensureGraph, sourceType]);
-
-  const next = useCallback(() => {
-    if (blocked()) return;
-    void goNext(false);
-  }, [blocked, goNext]);
-  const prev = useCallback(() => {
-    if (blocked()) return;
-    goPrev();
-  }, [blocked, goPrev]);
-
   /* -------------------------------- room (host push) ------------------------------- */
   const pushRoom = useCallback(() => {
     const r = roomRef.current;
@@ -626,6 +900,59 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, [sourceType]);
 
+  const toggle = useCallback(() => {
+    if (blocked() || !currentRef.current) return;
+    ensureGraph();
+    if (acRef.current?.state === "suspended") {
+      acRef.current.resume().catch(() => {});
+    }
+    if (sourceType === "youtube" || (!audioRef.current?.src && youtubeAudio.activeVideoId)) {
+      if (youtubeAudio.isPlaying) {
+        userPausedRef.current = true;
+        youtubeAudio.pause();
+        if (keepaliveAudioRef.current) {
+          try {
+            keepaliveAudioRef.current.pause();
+          } catch (_) {}
+        }
+      } else {
+        userPausedRef.current = false;
+        youtubeAudio.resume();
+        if (keepaliveAudioRef.current) {
+          try {
+            keepaliveAudioRef.current.play().catch(() => {});
+          } catch (_) {}
+        }
+      }
+    } else {
+      const a = audioRef.current;
+      if (!a) return;
+      if (a.paused) {
+        userPausedRef.current = false;
+        if (!a.src && currentRef.current) {
+          void loadTrack(currentRef.current, { autoplay: true, startAt: position });
+        } else {
+          a.play().catch(() => {});
+        }
+      } else {
+        userPausedRef.current = true;
+        a.pause();
+      }
+    }
+    if (roomRef.current?.isHost) {
+      setTimeout(pushRoom, 40);
+    }
+  }, [blocked, ensureGraph, sourceType, loadTrack, position, pushRoom]);
+
+  const next = useCallback(() => {
+    if (blocked()) return;
+    void goNext(false);
+  }, [blocked, goNext]);
+  const prev = useCallback(() => {
+    if (blocked()) return;
+    goPrev();
+  }, [blocked, goPrev]);
+
   const seek = useCallback(
     (t: number) => {
       if (blocked()) return;
@@ -640,8 +967,9 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         setPosition(a.currentTime);
       }
       setTimeout(pushRoom, 50);
+      saveLastTrackState();
     },
-    [blocked, sourceType, pushRoom],
+    [blocked, sourceType, pushRoom, saveLastTrackState],
   );
 
   const setVolume = useCallback((v: number) => {
@@ -842,90 +1170,100 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
 
       const cleanTitle = (t.title || "Track").replace(/[/\\?%*:|"<>]/g, "_");
       const cleanArtist = (t.artist || "Artist").replace(/[/\\?%*:|"<>]/g, "_");
-      const filename = `${cleanArtist} - ${cleanTitle} [${quality}k].mp3`;
+      let filename = `${cleanArtist} - ${cleanTitle} [${quality}k].m4a`;
 
       const params = new URLSearchParams({
         title: t.title,
         artist: t.artist,
         album: t.album || "",
         cover: t.coverBig || t.cover || "",
+        duration: String(t.duration || 0),
         quality: String(quality),
       });
 
-      const downloadRelUrl = `/api/download/${t.id}?${params.toString()}`;
+      if (t.audioUrl && t.audioUrl.startsWith("http")) {
+        params.set("stream", t.audioUrl);
+      } else if (t.streamUrl && t.streamUrl.startsWith("http")) {
+        params.set("stream", t.streamUrl);
+      }
+
+      const downloadRelUrl = `/api/download/${encodeURIComponent(t.id)}?${params.toString()}`;
       const absoluteUrl =
         typeof window !== "undefined" && window.location?.origin
           ? `${window.location.origin}${downloadRelUrl}`
           : downloadRelUrl;
 
-      // 1. Android Native App (prompts user to pick folder via Android System File Picker)
+      toast(`Downloading “${t.title}”…`);
+
+      // 1. Android Native App (if AndroidDownloader interface is injected into WebView)
       const androidDownloader = typeof window !== "undefined" ? (window as any).AndroidDownloader : null;
       if (androidDownloader && typeof androidDownloader.downloadFile === "function") {
-        toast(`Select where to save “${t.title}”…`);
-        androidDownloader.downloadFile(absoluteUrl, filename, "audio/mpeg");
+        androidDownloader.downloadFile(absoluteUrl, filename, "audio/mp4");
+        setTimeout(() => {
+          toast(`“${t.title}” download complete!`, "ok");
+        }, 3000);
         return;
       }
 
-      // 2. Modern Web Browser with File System Access API (Save As file dialog)
-      if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
-        try {
-          const handle = await (window as any).showSaveFilePicker({
-            suggestedName: filename,
-            types: [
-              {
-                description: "MP3 Audio",
-                accept: { "audio/mpeg": [".mp3"] },
-              },
-            ],
-          });
-          toast(`Saving “${t.title}” to chosen location…`);
-          const res = await fetch(downloadRelUrl);
-          if (!res.ok) throw new Error("Download request failed");
-          const blob = await res.blob();
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          toast(`Saved “${t.title}” successfully!`);
-          return;
-        } catch (err: any) {
-          if (err.name === "AbortError") {
-            // User cancelled folder picker
-            return;
-          }
-          // If showSaveFilePicker threw another error, fallback to <a> download
-        }
-      }
+      // 2. Browser Download (Mobile & Desktop) via Blob
+      try {
+        const res = await fetch(downloadRelUrl);
+        if (!res.ok) throw new Error(`Download request failed (${res.status})`);
 
-      // 3. Web Mobile / Android device save sheet
-      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        try {
-          toast(`Preparing “${t.title}” download…`);
-          const res = await fetch(downloadRelUrl);
-          if (res.ok) {
-            const blob = await res.blob();
-            const file = new File([blob], filename, { type: "audio/mpeg" });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: filename,
-              });
-              toast(`“${t.title}” ready!`);
-              return;
-            }
-          }
-        } catch (e: any) {
-          if (e.name === "AbortError") return;
+        const disposition = res.headers.get("content-disposition");
+        let serverFilename = "";
+        if (disposition && disposition.includes("filename=")) {
+          const match = disposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;\r\n"']*)['"]?/i);
+          if (match && match[1]) serverFilename = decodeURIComponent(match[1]);
         }
-      }
+        const formatHeader = res.headers.get("x-audio-format");
+        const isM4a = formatHeader === "m4a" || serverFilename.endsWith(".m4a");
+        const ext = isM4a ? "m4a" : "mp3";
+        const mimeType = isM4a ? "audio/mp4" : "audio/mpeg";
+        filename = serverFilename || `${cleanArtist} - ${cleanTitle} [${quality}k].${ext}`;
 
-      // 4. Fallback standard browser download
-      const a = document.createElement("a");
-      a.href = absoluteUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      toast(`Downloading “${t.title}” (MP3 · 320 kbps ID3 tagged)`);
+        const blob = await res.blob();
+        const cleanBlob = new Blob([blob], { type: mimeType });
+
+        const blobUrl = URL.createObjectURL(cleanBlob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          URL.revokeObjectURL(blobUrl);
+          a.remove();
+        }, 5000);
+
+        try {
+          const confetti = (await import("canvas-confetti")).default;
+          confetti({ particleCount: 60, spread: 70, origin: { y: 0.85 } });
+        } catch (_) {}
+
+        toast(`“${t.title}” download complete!`, "ok");
+
+        if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+          try {
+            new Notification("Download Complete", {
+              body: `“${t.title}” downloaded with cover art & lyrics.`,
+              icon: t.cover || "/icon-192.png",
+            });
+          } catch (_) {}
+        }
+      } catch (err: any) {
+        console.error("Direct fetch download failed, falling back to browser navigation:", err);
+        // Fallback: direct browser link click
+        const a = document.createElement("a");
+        a.href = downloadRelUrl;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 2500);
+      }
     },
     [toast],
   );
@@ -1014,14 +1352,20 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     [toast],
   );
 
-  // poll the room
+  // poll the room with RTT latency compensation & micro-drift rate tuning
   useEffect(() => {
     if (!roomCode) return;
     let stopped = false;
     let lastTrackId: string | null = null;
+    let inFlight = false;
+
     const tick = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      const t0 = performance.now();
       try {
         const res = await fetch(`/api/rooms/${roomCode}`, { cache: "no-store" });
+        const rtt = (performance.now() - t0) / 1000;
         if (stopped) return;
         if (res.status === 404 || res.status === 401) {
           setRoomCode(null);
@@ -1032,12 +1376,28 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         }
         const info: RoomInfo = await res.json();
         roomRef.current = info;
-        setRoom(info);
+        setRoom((prev) => {
+          const serverMsgs = Array.isArray(info.messages) ? info.messages : [];
+          const pendingOptimistic = (prev?.messages || []).filter(
+            (m) =>
+              m.id.startsWith("opt-") &&
+              Date.now() - m.timestamp < 10000 &&
+              !serverMsgs.some((sm) => String(sm.userId) === String(m.userId) && sm.text === m.text)
+          );
+          return {
+            ...info,
+            messages: [...serverMsgs, ...pendingOptimistic],
+          };
+        });
         const st = info.state;
         const a = audioRef.current;
-        if (info.isHost || !st?.track || !a) return;
-        const elapsed = st.playing ? (info.serverNow - info.updatedAt) / 1000 : 0;
-        let expected = st.position + elapsed;
+        if (info.isHost || !st?.track) return;
+
+        // Latency compensation: server elapsed + network transit time estimate (RTT / 2)
+        const serverElapsed = st.playing ? Math.max(0, (info.serverNow - info.updatedAt) / 1000) : 0;
+        const networkTransit = st.playing ? Math.min(1.0, rtt / 2) : 0;
+        let expected = st.position + serverElapsed + networkTransit;
+
         const curId = currentRef.current?.id;
         if (st.track.id !== curId || lastTrackId !== st.track.id) {
           lastTrackId = st.track.id;
@@ -1046,38 +1406,81 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
           loadTrack(st.track, { autoplay: st.playing, startAt: expected });
           return;
         }
+
         // keep the queue view in sync
         if (st.queue.length !== queueRef.current.length) setQ(st.queue, st.index);
         else if (st.index !== indexRef.current) {
           indexRef.current = st.index;
           setIndex(st.index);
         }
-        if (Number.isFinite(a.duration)) expected = Math.min(expected, Math.max(0, a.duration - 0.2));
-        if (Math.abs(a.currentTime - expected) > 1.6 && a.readyState > 0) a.currentTime = expected;
-        if (st.playing && a.paused) a.play().catch(() => {});
-        if (!st.playing && !a.paused) a.pause();
+
+        // HTML5 Audio sync (HTML audio element)
+        if (a && a.src && sourceType !== "youtube") {
+          if (Number.isFinite(a.duration) && a.duration > 0) {
+            expected = Math.min(expected, Math.max(0, a.duration - 0.2));
+          }
+          const curTime = a.currentTime;
+          const diff = expected - curTime; // positive: listener is behind host
+
+          if (a.readyState > 0) {
+            if (Math.abs(diff) > 0.75) {
+              // Large drift: seek immediately
+              a.currentTime = expected;
+              a.playbackRate = 1.0;
+            } else if (diff > 0.08) {
+              // Slightly behind (80ms to 750ms): gently speed up 5% to lock in phase
+              a.playbackRate = 1.05;
+            } else if (diff < -0.08) {
+              // Slightly ahead (-80ms to -750ms): gently slow down 5%
+              a.playbackRate = 0.95;
+            } else {
+              // In sync (within 80ms)
+              a.playbackRate = 1.0;
+            }
+          }
+
+          if (st.playing && a.paused) a.play().catch(() => {});
+          if (!st.playing && !a.paused) {
+            a.pause();
+            a.playbackRate = 1.0;
+          }
+        }
+
+        // YouTube Audio sync
+        if (sourceType === "youtube" || youtubeAudio.activeVideoId) {
+          const ytCur = youtubeAudio.getCurrentTime();
+          const ytDiff = expected - ytCur;
+          if (Math.abs(ytDiff) > 0.8) {
+            youtubeAudio.seekTo(expected);
+          }
+          if (st.playing && !youtubeAudio.isPlaying) youtubeAudio.resume();
+          if (!st.playing && youtubeAudio.isPlaying) youtubeAudio.pause();
+        }
       } catch {
         /* transient network error */
+      } finally {
+        inFlight = false;
       }
     };
     tick();
-    const id = setInterval(tick, 1200);
+    const id = setInterval(tick, 1000);
     return () => {
       stopped = true;
       clearInterval(id);
+      if (audioRef.current) audioRef.current.playbackRate = 1.0;
     };
-  }, [roomCode, toast, setQ, loadTrack]);
+  }, [roomCode, toast, setQ, loadTrack, sourceType]);
 
-  // host pushes on change + heartbeat
+  // host pushes on change + fast heartbeat
   const isHost = room?.isHost ?? false;
   useEffect(() => {
     if (!roomCode || !isHost) return;
-    const t = setTimeout(pushRoom, 120);
+    const t = setTimeout(pushRoom, 80);
     return () => clearTimeout(t);
   }, [roomCode, isHost, current?.id, playing, queue, pushRoom]);
   useEffect(() => {
     if (!roomCode || !isHost) return;
-    const id = setInterval(pushRoom, 4000);
+    const id = setInterval(pushRoom, 1200);
     return () => clearInterval(id);
   }, [roomCode, isHost, pushRoom]);
 
@@ -1087,19 +1490,31 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       onPlaying: () => {
         setPlaying(true);
         setLoading(false);
+        if (keepaliveAudioRef.current && keepaliveAudioRef.current.paused) {
+          keepaliveAudioRef.current.play().catch(() => {});
+        }
       },
       onPaused: () => {
+        if (typeof document !== "undefined" && document.hidden && !userPausedRef.current) {
+          // Ignore background pause triggered by Android minimizing the window
+          return;
+        }
         setPlaying(false);
+        if (keepaliveAudioRef.current && !keepaliveAudioRef.current.paused) {
+          keepaliveAudioRef.current.pause();
+        }
+        saveLastTrackState();
       },
       onBuffering: () => {
         setLoading(true);
       },
       onEnded: () => {
+        if (keepaliveAudioRef.current) keepaliveAudioRef.current.pause();
         if (lockedRef.current) return;
         void goNext(true);
       },
       onTimeUpdate: (cur, dur) => {
-        if (youtubeAudio.isPlaying) {
+        if (sourceTypeRef.current === "youtube") {
           setPosition(cur);
           if (dur > 0) setDuration(dur);
           const curTrack = currentRef.current;
@@ -1107,14 +1522,20 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
             loggedRef.current = true;
             logPlayRef.current(curTrack, Math.round(cur));
           }
+          const now = Date.now();
+          if (now - lastSaveTimeRef.current > 2500) {
+            lastSaveTimeRef.current = now;
+            saveLastTrackState();
+          }
         }
       },
       onError: () => {
+        if (keepaliveAudioRef.current) keepaliveAudioRef.current.pause();
         setLoading(false);
         setPlaying(false);
       },
     });
-  }, [goNext]);
+  }, [goNext, saveLastTrackState]);
 
   /* ------------------------------ audio element events ------------------------------ */
   useEffect(() => {
@@ -1132,17 +1553,41 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     a.muted = Boolean(muted);
 
     const onPlay = () => {
+      if (sourceTypeRef.current === "youtube") return;
+      userPausedRef.current = false;
       a.volume = typeof volumeRef.current === "number" && !isNaN(volumeRef.current) ? Math.max(0, Math.min(1, volumeRef.current)) : 0.85;
       a.muted = Boolean(mutedRef.current);
       setPlaying(true);
     };
-    const onPause = () => setPlaying(false);
+    const onPause = () => {
+      if (sourceTypeRef.current === "youtube") return;
+      // If the pause event fired while document is hidden and user didn't explicitly pause,
+      // it was triggered by Android browser suspending background tabs. Auto-resume!
+      if (typeof document !== "undefined" && document.hidden && !userPausedRef.current && playingRef.current) {
+        const audio = audioRef.current;
+        if (audio && audio.src) {
+          audio.play().catch(() => {
+            setPlaying(false);
+            saveLastTrackState();
+          });
+          return;
+        }
+      }
+      setPlaying(false);
+      saveLastTrackState();
+    };
     const onTime = () => {
+      if (sourceTypeRef.current === "youtube") return;
       setPosition(a.currentTime);
       const cur = currentRef.current;
       if (!loggedRef.current && cur && a.currentTime >= 10 && !lockedRef.current) {
         loggedRef.current = true;
         logPlayRef.current(cur, Math.round(a.currentTime));
+      }
+      const now = Date.now();
+      if (now - lastSaveTimeRef.current > 2500) {
+        lastSaveTimeRef.current = now;
+        saveLastTrackState();
       }
       if ("mediaSession" in navigator && Number.isFinite(a.duration) && Date.now() - lastPosState.current > 1000) {
         lastPosState.current = Date.now();
@@ -1158,6 +1603,7 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       }
     };
     const onMeta = () => {
+      if (sourceTypeRef.current === "youtube") return;
       setDuration(Number.isFinite(a.duration) ? a.duration : 0);
       if (pendingStart.current > 0) {
         a.currentTime = Math.min(pendingStart.current, Math.max(0, a.duration - 0.2));
@@ -1165,15 +1611,21 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       }
     };
     const onCanPlay = () => {
+      if (sourceTypeRef.current === "youtube") return;
       setLoading(false);
       errorStreak.current = 0;
     };
-    const onWaiting = () => setLoading(true);
+    const onWaiting = () => {
+      if (sourceTypeRef.current === "youtube") return;
+      setLoading(true);
+    };
     const onEnded = () => {
+      if (sourceTypeRef.current === "youtube") return;
       if (lockedRef.current) return;
       void goNext(true);
     };
     const onError = () => {
+      if (sourceTypeRef.current === "youtube") return;
       if (!a.src || a.src === window.location.href) return;
       setLoading(false);
       const cur = currentRef.current;
@@ -1235,6 +1687,21 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     if ("mediaSession" in navigator) navigator.mediaSession.playbackState = playing ? "playing" : "paused";
   }, [playing]);
 
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    if (current && Number.isFinite(duration) && duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          position: Math.min(position, duration),
+          playbackRate: playbackRate,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [current, duration, position, playbackRate]);
+
   const api = useRef({ toggle, next, prev, seek });
   api.current = { toggle, next, prev, seek };
   useEffect(() => {
@@ -1249,10 +1716,12 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
     };
     const audio = () => audioRef.current;
     set("play", () => {
+      userPausedRef.current = false;
       const a = audio();
       if (a?.paused) api.current.toggle();
     });
     set("pause", () => {
+      userPausedRef.current = true;
       const a = audio();
       if (a && !a.paused) api.current.toggle();
     });
@@ -1284,6 +1753,15 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+        return;
+      }
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) {
         if (e.key === "Escape") el.blur();
@@ -1393,6 +1871,7 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
 
   const value: PlayerCtx = {
     current,
+    trackTheme,
     queue,
     index,
     playing,

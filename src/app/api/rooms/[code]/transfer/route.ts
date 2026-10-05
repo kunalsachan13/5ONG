@@ -34,7 +34,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
       hostName: targetMember.name,
     });
 
-    roomChatManager.addMessage(code, {
+    await roomChatManager.addMessage(code, {
       userId: "system",
       userName: "System",
       text: `👑 ${u.username} transferred host status to ${targetMember.name}.`,

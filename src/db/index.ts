@@ -1,3 +1,7 @@
+if (typeof window !== "undefined") {
+  throw new Error("Security Error: @/db cannot be imported on the client side.");
+}
+
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";

@@ -4,7 +4,7 @@
 
 @theme {
   --color-ink: #35304f;
-  --color-muted: #7b7596;
+  --color-muted: #595279;
   --color-cream: #faf6ff;
   --color-lilac: #cdb8ff;
   --color-lilac-deep: #9b7fe8;
@@ -22,17 +22,34 @@ body {
   height: 100%;
 }
 
+:root,
+html {
+  color-scheme: dark;
+}
+
 body {
   color: var(--color-ink);
   background-color: var(--color-cream);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  min-height: 100%;
+}
+
+/* Isolated GPU layer for background gradients to eliminate mobile CPU repaint/lag */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(900px 500px at 8% -10%, rgba(205, 184, 255, 0.55), transparent 60%),
     radial-gradient(800px 500px at 100% 0%, rgba(255, 196, 221, 0.5), transparent 60%),
     radial-gradient(900px 600px at 50% 110%, rgba(188, 220, 255, 0.5), transparent 60%);
-  background-attachment: fixed;
-  font-family: var(--font-sans);
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Dark Mode Tokens & Overrides (High Visibility & Pristine Contrast) */
@@ -54,10 +71,38 @@ html.dark {
 html.dark body {
   color: var(--color-ink);
   background-color: #0b0917;
+}
+
+html.dark body::before {
   background-image:
     radial-gradient(900px 500px at 8% -10%, rgba(168, 85, 247, 0.22), transparent 60%),
     radial-gradient(800px 500px at 100% 0%, rgba(244, 114, 182, 0.16), transparent 60%),
     radial-gradient(900px 600px at 50% 110%, rgba(125, 211, 252, 0.14), transparent 60%);
+}
+
+/* Native GPU View Transitions for buttery smooth theme toggling on Android & Desktop */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: fade-in;
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 ::selection {
@@ -186,6 +231,10 @@ html.dark .btn-ghost:hover {
   cursor: pointer;
   flex-shrink: 0;
 }
+.icon-btn.hidden,
+.icon-btn.\!hidden {
+  display: none !important;
+}
 .icon-btn:hover {
   background: rgba(155, 127, 232, 0.14);
   color: var(--color-ink);
@@ -219,6 +268,9 @@ html.dark .icon-btn.on {
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+.input::placeholder {
+  color: #635d84;
+}
 .input:focus {
   border-color: var(--color-lilac-deep);
   box-shadow: 0 0 0 4px rgba(155, 127, 232, 0.18);
@@ -227,6 +279,9 @@ html.dark .input {
   background: rgba(18, 14, 34, 0.9);
   border-color: rgba(176, 150, 245, 0.25);
   color: #f2eefa;
+}
+html.dark .input::placeholder {
+  color: #9d94be;
 }
 html.dark .input:focus {
   border-color: var(--color-lilac-deep);
@@ -355,3 +410,124 @@ html.dark .range::-moz-range-thumb {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Desktop App Titlebar Drag & Window Controls Overlay */
+.titlebar-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.titlebar-no-drag,
+.titlebar-drag button,
+.titlebar-drag input,
+.titlebar-drag a,
+.titlebar-drag [role="button"],
+.titlebar-drag .no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+@media (display-mode: window-controls-overlay) {
+  header.titlebar-drag {
+    padding-top: max(env(titlebar-area-y, 0px), 0.6rem);
+    padding-left: calc(env(titlebar-area-x, 0px) + 0.85rem);
+    padding-right: calc(100vw - env(titlebar-area-width, 100vw) + 0.85rem);
+    min-height: max(env(titlebar-area-height, 40px), 3.5rem);
+    background: rgba(250, 246, 255, 0.78);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border-bottom: 1px solid rgba(53, 48, 79, 0.08);
+  }
+
+  html.dark header.titlebar-drag {
+    background: rgba(12, 9, 24, 0.82);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  aside.app-sidebar {
+    padding-top: max(env(titlebar-area-y, 0px), 0.75rem);
+  }
+}
+
+/* ==========================================================================
+   Adaptive Theme (Full App Palette Dynamic Sync from Song Cover Art)
+   ========================================================================== */
+html.theme-adaptive body {
+  background-color: var(--theme-bg-end, #0b0917);
+  transition: background-color 0.8s ease;
+}
+
+html.theme-adaptive body::before {
+  background-image:
+    radial-gradient(900px 550px at 10% -10%, color-mix(in srgb, var(--theme-primary, #a855f7) 32%, transparent), transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, color-mix(in srgb, var(--theme-accent, #ec4899) 26%, transparent), transparent 60%),
+    radial-gradient(900px 650px at 50% 110%, color-mix(in srgb, var(--theme-glow, #3b82f6) 24%, transparent), transparent 60%) !important;
+  transition: background-image 0.8s ease, opacity 0.5s ease;
+}
+
+html.theme-adaptive .btn-primary {
+  background: linear-gradient(135deg, var(--theme-primary, #a855f7) 0%, var(--theme-accent, #ec4899) 100%) !important;
+  color: var(--theme-button-text, #ffffff) !important;
+  box-shadow: 0 6px 20px var(--theme-glow, rgba(168, 85, 247, 0.45)) !important;
+}
+
+html.theme-adaptive .btn-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 8px 26px var(--theme-glow, rgba(168, 85, 247, 0.6)) !important;
+}
+
+html.theme-adaptive .btn-soft {
+  background: color-mix(in srgb, var(--theme-bg-start, #231b3a) 60%, rgba(20, 15, 38, 0.85)) !important;
+  border-color: color-mix(in srgb, var(--theme-primary, #a855f7) 35%, transparent) !important;
+  color: #f8f6fd !important;
+}
+
+html.theme-adaptive .btn-soft:hover {
+  background: color-mix(in srgb, var(--theme-bg-start, #231b3a) 85%, rgba(54, 42, 88, 0.95)) !important;
+  border-color: var(--theme-primary, #a855f7) !important;
+}
+
+html.theme-adaptive .card {
+  border-color: color-mix(in srgb, var(--theme-primary, #a855f7) 22%, transparent) !important;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.5), 0 0 20px color-mix(in srgb, var(--theme-glow, #a855f7) 12%, transparent) !important;
+}
+
+html.theme-adaptive .glass {
+  border-color: color-mix(in srgb, var(--theme-primary, #a855f7) 26%, transparent) !important;
+}
+
+html.theme-adaptive .range {
+  background: linear-gradient(to right, var(--theme-primary, var(--color-lilac-deep)) var(--p, 0%), rgba(255, 255, 255, 0.15) var(--p, 0%)) !important;
+}
+
+html.theme-adaptive .range::-webkit-slider-thumb {
+  border-color: var(--theme-primary, var(--color-lilac-deep)) !important;
+  box-shadow: 0 2px 10px var(--theme-glow, rgba(0, 0, 0, 0.5)) !important;
+}
+
+html.theme-adaptive .range::-moz-range-thumb {
+  border-color: var(--theme-primary, var(--color-lilac-deep)) !important;
+}
+
+html.theme-adaptive .input:focus {
+  border-color: var(--theme-primary, var(--color-lilac-deep)) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-primary) 22%, transparent) !important;
+}
+
+html.theme-adaptive ::selection {
+  background: color-mix(in srgb, var(--theme-primary, #a855f7) 45%, transparent) !important;
+}
+
+html.theme-adaptive * {
+  scrollbar-color: color-mix(in srgb, var(--theme-primary, #a855f7) 40%, transparent) transparent !important;
+}
+
+html.theme-adaptive .icon-btn.on {
+  color: var(--theme-primary, #cbb8ff) !important;
+  background: color-mix(in srgb, var(--theme-primary, #a855f7) 24%, transparent) !important;
+}
+
+html.theme-adaptive .eq-anim span {
+  background: var(--theme-primary, var(--color-lilac-deep)) !important;
+}
+

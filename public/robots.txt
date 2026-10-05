@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/callback
+Disallow: /_next/
+
+Sitemap: https://5ong.app/sitemap.xml

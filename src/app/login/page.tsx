@@ -42,6 +42,7 @@ function LoginInner() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [hpWebsite, setHpWebsite] = useState(""); // Honeypot trap for spam bots
   const [otpType, setOtpType] = useState<"email" | "phone">("email");
   const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState("");
@@ -96,18 +97,48 @@ function LoginInner() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Bot honeypot verification
+    if (hpWebsite) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      setError("Unable to process request.");
+      return;
+    }
+
     if (mode === "signin") {
-      const j = await post("/api/auth/login", { identifier, password });
+      if (!identifier.trim() || identifier.trim().length < 2) {
+        setError("Please enter a valid email, username, or phone number.");
+        return;
+      }
+      if (!password || password.length < 6) {
+        setError("Password must be at least 6 characters.");
+        return;
+      }
+
+      const j = await post("/api/auth/login", { identifier: identifier.trim(), password });
       if (j) {
         setUser(j.user);
         toast(`Welcome back, ${j.user.username}!`);
       }
     } else if (mode === "register") {
       const cleanUsername = username.toLowerCase().trim();
+      if (!/^[a-z0-9_]{3,24}$/.test(cleanUsername)) {
+        setError("Username must be 3-24 characters containing only lowercase letters, numbers, and underscores.");
+        return;
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        setError("Please provide a valid email address.");
+        return;
+      }
+      if (!password || password.length < 6) {
+        setError("Password must be at least 6 characters.");
+        return;
+      }
+
       const j = await post("/api/auth/register", {
-        email: email || undefined,
+        email: email.trim() || undefined,
         username: cleanUsername,
-        phoneNumber: phoneNumber || undefined,
+        phoneNumber: phoneNumber.trim() || undefined,
         password,
       });
       if (j) {
@@ -115,7 +146,19 @@ function LoginInner() {
         toast(`Welcome to 5ONG, ${j.user.username}!`);
       }
     } else if (!otpSent) {
-      const payload = otpType === "email" ? { email } : { phoneNumber };
+      if (otpType === "email") {
+        if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+          setError("Please enter a valid email address.");
+          return;
+        }
+      } else {
+        if (!phoneNumber.trim() || phoneNumber.trim().length < 7) {
+          setError("Please enter a valid phone number.");
+          return;
+        }
+      }
+
+      const payload = otpType === "email" ? { email: email.trim() } : { phoneNumber: phoneNumber.trim() };
       const j = await post("/api/auth/otp/request", payload);
       if (j) {
         setOtpSent(true);
@@ -129,7 +172,12 @@ function LoginInner() {
         }
       }
     } else {
-      const payload = otpType === "email" ? { email, code } : { phoneNumber, code };
+      if (!code.trim()) {
+        setError("Please enter the verification code.");
+        return;
+      }
+
+      const payload = otpType === "email" ? { email: email.trim(), code: code.trim() } : { phoneNumber: phoneNumber.trim(), code: code.trim() };
       const j = await post("/api/auth/otp/verify", payload);
       if (j) {
         setUser(j.user);
@@ -188,6 +236,19 @@ function LoginInner() {
         </div>
 
         <form className="flex flex-col gap-3" onSubmit={submit}>
+          {/* Honeypot field for bot protection */}
+          <div className="sr-only" aria-hidden="true" style={{ display: "none" }}>
+            <label htmlFor="hp_website">Website</label>
+            <input
+              id="hp_website"
+              name="hp_website"
+              type="text"
+              value={hpWebsite}
+              onChange={(e) => setHpWebsite(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
           {mode === "signin" && (
             <>
               <input

@@ -11,7 +11,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
     const room = await firebaseDb.getRoom(code);
     if (!room) throw new HttpError(404, "This room has ended");
 
-    const messages = roomChatManager.getMessages(code);
+    const messages = await roomChatManager.getMessages(code);
     return Response.json({ messages });
   } catch (e) {
     return errorResponse(e);
@@ -29,14 +29,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
     const text = String(body.text ?? "").trim();
     if (!text) throw new HttpError(400, "Message cannot be empty");
 
-    const message = roomChatManager.addMessage(code, {
+    const message = await roomChatManager.addMessage(code, {
       userId: u.id,
       userName: u.username,
       userAvatar: u.avatarUrl,
       text,
     });
 
-    return Response.json({ ok: true, message, messages: roomChatManager.getMessages(code) });
+    const messages = await roomChatManager.getMessages(code);
+    return Response.json({ ok: true, message, messages });
   } catch (e) {
     return errorResponse(e);
   }

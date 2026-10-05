@@ -1,3 +1,7 @@
+if (typeof window !== "undefined") {
+  throw new Error("Security Error: @/lib/neonAuthServer cannot be imported on the client side.");
+}
+
 import { createNeonAuth } from "@neondatabase/auth/next/server";
 
 export const auth = createNeonAuth({

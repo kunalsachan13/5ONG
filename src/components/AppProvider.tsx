@@ -25,6 +25,7 @@ interface AppCtx {
   createPlaylist: (name: string, tracks?: Track[]) => Promise<PlaylistSummary | null>;
   addToPlaylist: (playlistId: number | string, tracks: Track[]) => Promise<void>;
   logPlay: (t: Track, seconds: number) => void;
+  clearDataAndCache: () => Promise<void>;
   toast: (msg: string, kind?: "ok" | "err") => void;
   toasts: { id: number; msg: string; kind: "ok" | "err" }[];
 }
@@ -251,6 +252,59 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const clearDataAndCache = useCallback(async () => {
+    // 1. Reset in-memory listening history
+    setHistory([]);
+
+    // 2. Clear history and recommendation cache from localStorage (keeps playlists & likes)
+    try {
+      if (user?.id) {
+        localStorage.removeItem(getStorageKey("history", user.id));
+      }
+      localStorage.removeItem(getStorageKey("history", null));
+
+      // Remove search cache, recommendation cache, player lastTrack cache
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.includes("history") ||
+            k.includes("recommend") ||
+            k.includes("search_cache") ||
+            k.includes("lastTrack") ||
+            k.includes("taste") ||
+            k.includes("cache"))
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (_) {}
+
+    // 3. Clear sessionStorage
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
+
+    // 4. Clear browser CacheStorage (ServiceWorker caches)
+    try {
+      if (typeof window !== "undefined" && "caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (_) {}
+
+    // 5. If logged in, clear listening history on server
+    if (user) {
+      try {
+        await fetch("/api/history", { method: "DELETE" });
+      } catch (_) {}
+    }
+
+    toast("Recommendation data, history & cache cleared! Playlists and local songs kept safe.", "ok");
+  }, [user, toast]);
+
   const value: AppCtx = {
     user,
     ready,
@@ -266,6 +320,7 @@ export default function AppProvider({ children }: { children: ReactNode }) {
     createPlaylist,
     addToPlaylist,
     logPlay,
+    clearDataAndCache,
     toast,
     toasts,
   };

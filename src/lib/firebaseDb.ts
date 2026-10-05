@@ -3,7 +3,7 @@
  * Provides true relational persistence & user isolation for Users, Playlists, Likes, History, and Rooms.
  */
 import { db } from "@/db";
-import { users, playlists, playlistTracks, likedTracks, listeningLogs, rooms, otpCodes, usernameChanges } from "@/db/schema";
+import { users, playlists, playlistTracks, likedTracks, listeningLogs, rooms, otpCodes, usernameChanges, roomMessages } from "@/db/schema";
 import { eq, and, or, desc, asc, sql } from "drizzle-orm";
 
 declare global {
@@ -800,6 +800,18 @@ export const firebaseDb = {
     memoryStore.history.set(sId, [item, ...cur.slice(0, 99)]);
   },
 
+  async clearHistory(userId: string | number) {
+    const numId = Number(userId);
+    if (db && !isNaN(numId)) {
+      try {
+        await db.delete(listeningLogs).where(eq(listeningLogs.userId, numId));
+      } catch (e) {
+        console.error("[Neon DB] clearHistory error:", e);
+      }
+    }
+    memoryStore.history.delete(String(userId));
+  },
+
   // ---------------- Rooms ----------------
   async getRoom(code: string) {
     const cleanCode = code.toUpperCase().trim();
@@ -858,11 +870,104 @@ export const firebaseDb = {
     if (db) {
       try {
         await db.delete(rooms).where(eq(rooms.code, cleanCode));
+        await db.delete(roomMessages).where(eq(roomMessages.code, cleanCode)).catch(() => {});
         return;
       } catch (e) {
         console.error("[Neon DB] deleteRoom error:", e);
       }
     }
     memoryStore.rooms.delete(cleanCode);
+    const mm = (memoryStore as any).roomMessages;
+    if (mm) mm.delete(cleanCode);
+  },
+
+  async getRoomMessages(code: string) {
+    const cleanCode = code.toUpperCase().trim();
+    if (db) {
+      try {
+        const rows = await db
+          .select()
+          .from(roomMessages)
+          .where(eq(roomMessages.code, cleanCode))
+          .orderBy(asc(roomMessages.id))
+          .limit(100);
+
+        return rows.map((r) => ({
+          id: String(r.id),
+          userId: r.userId,
+          userName: r.userName,
+          userAvatar: r.userAvatar || null,
+          text: r.text,
+          timestamp: new Date(r.createdAt).getTime(),
+        }));
+      } catch (e) {
+        console.error("[Neon DB] getRoomMessages error:", e);
+      }
+    }
+    const mm = ((memoryStore as any).roomMessages = (memoryStore as any).roomMessages || new Map());
+    return mm.get(cleanCode) || [];
+  },
+
+  async addRoomMessage(
+    code: string,
+    msg: { userId: string | number; userName: string; userAvatar?: string | null; text: string }
+  ) {
+    const cleanCode = code.toUpperCase().trim();
+    const sUserId = String(msg.userId);
+    const sText = msg.text.trim().slice(0, 500);
+
+    if (db) {
+      try {
+        const [inserted] = await db
+          .insert(roomMessages)
+          .values({
+            code: cleanCode,
+            userId: sUserId,
+            userName: msg.userName,
+            userAvatar: msg.userAvatar || null,
+            text: sText,
+          })
+          .returning();
+
+        if (inserted) {
+          return {
+            id: String(inserted.id),
+            userId: inserted.userId,
+            userName: inserted.userName,
+            userAvatar: inserted.userAvatar || null,
+            text: inserted.text,
+            timestamp: new Date(inserted.createdAt).getTime(),
+          };
+        }
+      } catch (e) {
+        console.error("[Neon DB] addRoomMessage error:", e);
+      }
+    }
+
+    const mm = ((memoryStore as any).roomMessages = (memoryStore as any).roomMessages || new Map());
+    const existing = mm.get(cleanCode) || [];
+    const fallbackMsg = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      userId: msg.userId,
+      userName: msg.userName,
+      userAvatar: msg.userAvatar || null,
+      text: sText,
+      timestamp: Date.now(),
+    };
+    mm.set(cleanCode, [...existing.slice(-99), fallbackMsg]);
+    return fallbackMsg;
+  },
+
+  async deleteRoomMessages(code: string) {
+    const cleanCode = code.toUpperCase().trim();
+    if (db) {
+      try {
+        await db.delete(roomMessages).where(eq(roomMessages.code, cleanCode));
+      } catch (e) {
+        console.error("[Neon DB] deleteRoomMessages error:", e);
+      }
+    }
+    const mm = (memoryStore as any).roomMessages;
+    if (mm) mm.delete(cleanCode);
   },
 };

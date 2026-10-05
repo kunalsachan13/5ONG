@@ -1,49 +1,46 @@
+import { firebaseDb } from "@/lib/firebaseDb";
 import type { RoomChatMessage } from "@/lib/types";
 
-// In-memory ephemeral chat storage.
-// Chats are never saved to disk or persistent DB.
-// When the room ends or host closes it, the room's chat messages are instantly purged.
+// Persistent Room Chat Store backed by Neon DB Postgres via firebaseDb.
+// Messages are persisted across all Cloudflare Worker isolates worldwide,
+// and automatically purged when the room ends.
 class RoomChatManager {
-  private chats = new Map<string, RoomChatMessage[]>();
-
-  getMessages(code: string): RoomChatMessage[] {
+  async getMessages(code: string): Promise<RoomChatMessage[]> {
     const clean = code.toUpperCase().trim();
-    return this.chats.get(clean) || [];
+    return (await firebaseDb.getRoomMessages(clean)) as RoomChatMessage[];
   }
 
-  addMessage(
+  getCachedMessages(_code: string): RoomChatMessage[] {
+    return [];
+  }
+
+  async addMessage(
     code: string,
     msg: { userId: string | number; userName: string; userAvatar?: string | null; text: string }
-  ): RoomChatMessage {
+  ): Promise<RoomChatMessage> {
     const clean = code.toUpperCase().trim();
-    const list = this.chats.get(clean) || [];
     const trimmedText = msg.text.trim().slice(0, 500);
 
     // Prevent duplicate consecutive system messages
     if (msg.userId === "system") {
-      const lastMsg = list[list.length - 1];
-      if (lastMsg && lastMsg.userId === "system" && lastMsg.text === trimmedText) {
+      const existing = await this.getMessages(clean);
+      const lastMsg = existing[existing.length - 1];
+      if (lastMsg && String(lastMsg.userId) === "system" && lastMsg.text === trimmedText) {
         return lastMsg;
       }
     }
 
-    const newMsg: RoomChatMessage = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    return (await firebaseDb.addRoomMessage(clean, {
       userId: msg.userId,
       userName: msg.userName,
-      userAvatar: msg.userAvatar || null,
+      userAvatar: msg.userAvatar,
       text: trimmedText,
-      timestamp: Date.now(),
-    };
-    // Keep up to 100 recent messages per room
-    const updated = [...list.slice(-99), newMsg];
-    this.chats.set(clean, updated);
-    return newMsg;
+    })) as RoomChatMessage;
   }
 
-  deleteRoomChat(code: string) {
+  async deleteRoomChat(code: string) {
     const clean = code.toUpperCase().trim();
-    this.chats.delete(clean);
+    await firebaseDb.deleteRoomMessages(clean);
   }
 }
 

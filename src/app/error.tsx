@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { AlertCircle, RotateCcw, Home } from "lucide-react";
 import Link from "next/link";
+import { reportError } from "@/lib/errorMonitoring";
 
 export default function ErrorBoundary({
   error,
@@ -12,7 +13,7 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("5ONG App Error:", error);
+    reportError(error, { component: "app/error.tsx" });
   }, [error]);
 
   return (

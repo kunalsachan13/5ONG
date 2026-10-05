@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Sun, Moon, Laptop } from "lucide-react";
+import { Sun, Moon, Sparkles } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
-  const { resolvedTheme, toggleTheme } = useTheme();
+  const { theme, cycleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -16,20 +16,23 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     return <div className="h-9 w-9 rounded-full bg-white/40 dark:bg-white/5 animate-pulse" />;
   }
 
-  const isDark = resolvedTheme === "dark";
+  const isDark = theme === "dark";
+  const label = isDark ? "Switch to Light Theme" : "Switch to Dark Theme";
 
   return (
     <button
       type="button"
-      onClick={toggleTheme}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className={`icon-btn !h-9 !w-9 rounded-full bg-white/80 dark:bg-[#201938] border border-ink/10 dark:border-white/10 shadow-xs backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 text-ink dark:text-[#f2eefa] ${className}`}
+      onClick={cycleTheme}
+      aria-label={label}
+      title={label}
+      className={`icon-btn !h-9 !w-9 rounded-full border shadow-xs backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 bg-white/80 dark:bg-[#201938] border-ink/10 dark:border-white/10 ${
+        isDark ? "text-butter" : "text-amber-500"
+      } ${className}`}
     >
       {isDark ? (
-        <Sun size={17} className="text-butter transition-transform duration-300 hover:rotate-45" />
+        <Moon size={17} className="text-butter transition-transform duration-300 hover:-rotate-12" />
       ) : (
-        <Moon size={17} className="text-lilac-deep transition-transform duration-300 hover:-rotate-12" />
+        <Sun size={17} className="text-amber-500 transition-transform duration-300 hover:rotate-45" />
       )}
     </button>
   );

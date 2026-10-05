@@ -27,7 +27,7 @@ function SearchInner() {
   const [activeTab, setActiveTab] = useState<"all" | "songs" | "playlists" | "artists">("all");
 
   const url = artist
-    ? `/api/music/search?artist=${encodeURIComponent(artist)}`
+    ? `/api/music/search?artist=${encodeURIComponent(artist)}${name ? `&name=${encodeURIComponent(name)}` : ""}`
     : q
     ? `/api/music/search?q=${encodeURIComponent(q)}`
     : null;

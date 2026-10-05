@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   jsonb,
   pgTable,
@@ -110,6 +111,22 @@ export const roomMembers = pgTable(
     lastSeen: timestamp("last_seen").defaultNow().notNull(),
   },
   (t) => [unique("room_member_unique").on(t.code, t.userId)],
+);
+
+export const roomMessages = pgTable(
+  "room_messages",
+  {
+    id: serial("id").primaryKey(),
+    code: text("code")
+      .notNull()
+      .references(() => rooms.code, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    userName: text("user_name").notNull(),
+    userAvatar: text("user_avatar"),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("room_messages_code_idx").on(t.code)],
 );
 
 export interface RoomState {

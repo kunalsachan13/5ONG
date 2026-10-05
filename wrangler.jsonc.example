@@ -1,0 +1,49 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "5ong",
+	"compatibility_date": "2026-10-02",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "5ong"
+		}
+	],
+	"images": {
+		"binding": "IMAGES"
+	},
+	"vars": {
+		"GOOGLE_CLIENT_ID": "your-google-client-id",
+		"GOOGLE_CLIENT_SECRET": "your-google-client-secret",
+		"NEXT_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id",
+		"AUTH_SECRET": "your-auth-secret",
+		"JWT_SECRET": "your-jwt-secret",
+		"DATABASE_URL": "postgresql://...",
+		"DATABASE_URL_UNPOOLED": "postgresql://...",
+		"FIREBASE_PROJECT_ID": "i5ong-music",
+		"NEXT_PUBLIC_FIREBASE_API_KEY": "...",
+		"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "i5ong-music.firebaseapp.com",
+		"NEXT_PUBLIC_FIREBASE_PROJECT_ID": "i5ong-music",
+		"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": "i5ong-music.firebasestorage.app",
+		"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "...",
+		"NEXT_PUBLIC_FIREBASE_APP_ID": "...",
+		"NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID": "...",
+		"NEON_BRANCH": "production",
+		"NEON_AUTH_BASE_URL": "https://...",
+		"NEON_AUTH_JWKS_URL": "https://...",
+		"NEON_FUNCTION_API_BASE_URL": "https://...",
+		"AWS_ACCESS_KEY_ID": "...",
+		"AWS_SECRET_ACCESS_KEY": "...",
+		"AWS_ENDPOINT_URL_S3": "https://...",
+		"AWS_REGION": "us-east-2",
+		"NEON_AUTH_COOKIE_SECRET": "..."
+	}
+}

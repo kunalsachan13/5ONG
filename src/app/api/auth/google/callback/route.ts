@@ -1,12 +1,13 @@
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { firebaseDb } from "@/lib/firebaseDb";
-import { createSession, getOrigin, uniqueUsernameBase } from "@/lib/auth";
+import { createSessionToken, getOrigin, SESSION_COOKIE, toPublicUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const origin = getOrigin(req);
-  const fail = (code: string) => Response.redirect(`${origin}/login?error=${code}`, 302);
+  const fail = (code: string) => NextResponse.redirect(new URL(`/login?error=${code}`, origin), 302);
   try {
     const url = new URL(req.url);
     const googleErr = url.searchParams.get("error");
@@ -70,10 +71,11 @@ export async function GET(req: Request) {
     if (!u) {
       const existingByEmail = await firebaseDb.getUserByEmail(email);
       if (existingByEmail) {
-        u = await firebaseDb.updateUser(existingByEmail.id, {
+        const updated = await firebaseDb.updateUser(existingByEmail.id, {
           googleId,
           avatarUrl: existingByEmail.avatarUrl ?? info.picture ?? null,
         });
+        u = { ...existingByEmail, ...updated };
       }
     }
     if (!u) {
@@ -87,19 +89,12 @@ export async function GET(req: Request) {
       });
     }
 
-    const sessionToken = await createSession(u.id, u);
+    const sessionToken = await createSessionToken(u.id, toPublicUser(u));
 
-    const userAgent = req.headers.get("user-agent") || "";
-    const isAndroid = /android/i.test(userAgent);
-    const isDesktop = platform === "desktop" || Boolean(desktopPort);
-
-    if (isAndroid || isDesktop) {
+    if (desktopPort) {
+      const loopbackUrl = `http://127.0.0.1:${desktopPort}/auth-callback?token=${encodeURIComponent(sessionToken)}`;
       const appUrl = `song://auth-callback?token=${encodeURIComponent(sessionToken)}`;
-      const loopbackUrl = desktopPort
-        ? `http://127.0.0.1:${desktopPort}/auth-callback?token=${encodeURIComponent(sessionToken)}`
-        : "";
-
-      const deviceLabel = isDesktop ? "5ONG Desktop App" : "5ONG Android App";
+      const deviceLabel = "5ONG Desktop App";
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -194,12 +189,21 @@ export async function GET(req: Request) {
   </script>
 </body>
 </html>`;
-      return new Response(html, {
+      const htmlResponse = new Response(html, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
+      return htmlResponse;
     }
 
-    return Response.redirect(`${origin}/`, 302);
+    const redirectRes = NextResponse.redirect(new URL("/", origin), 302);
+    redirectRes.cookies.set(SESSION_COOKIE, sessionToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      secure: origin.startsWith("https"),
+    });
+    return redirectRes;
   } catch (e) {
     console.error(e);
     return fail("google_failed");
