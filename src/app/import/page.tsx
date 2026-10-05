@@ -33,9 +33,7 @@ type ProviderKey = "all" | "spotify" | "ytmusic" | "jiosaavn" | "amazon" | "text
 interface ProviderConfig {
   key: ProviderKey;
   label: string;
-  icon: string;
-  color: string;
-  badgeBg: string;
+  dotColor?: string;
   placeholder: string;
   hint: string;
   sampleUrl?: string;
@@ -45,38 +43,29 @@ const PROVIDERS: ProviderConfig[] = [
   {
     key: "all",
     label: "Auto-Detect",
-    icon: "✨",
-    color: "from-purple-500 to-pink-500",
-    badgeBg: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
-    placeholder: "Paste any link from Spotify, YouTube Music, JioSaavn, or Amazon Music...",
+    placeholder: "Paste any link from Spotify, YouTube, JioSaavn, or Amazon...",
     hint: "Paste a playlist link from any supported app. 5ONG will automatically detect the source!",
   },
   {
     key: "spotify",
     label: "Spotify",
-    icon: "🟢",
-    color: "from-emerald-500 to-green-600",
-    badgeBg: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
-    placeholder: "https://open.spotify.com/playlist/...",
+    dotColor: "bg-[#1db954]",
+    placeholder: "https://open.spotify.com/playlist/... or album/...",
     hint: "Paste any public Spotify playlist or album URL. We match every track to high-fidelity audio.",
     sampleUrl: "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
   },
   {
     key: "ytmusic",
     label: "YouTube Music",
-    icon: "🔴",
-    color: "from-red-500 to-rose-600",
-    badgeBg: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
-    placeholder: "https://music.youtube.com/playlist?list=... or youtube.com/playlist?list=...",
+    dotColor: "bg-[#ff0000]",
+    placeholder: "https://music.youtube.com/playlist?list=... or youtube.com/...",
     hint: "Paste YouTube Music or YouTube playlist links. Streams directly with verified audio matching.",
     sampleUrl: "https://music.youtube.com/playlist?list=PLMC9KNkIncKtPzgY-5rmhvj7fax8fdxoj",
   },
   {
     key: "jiosaavn",
     label: "JioSaavn",
-    icon: "🔵",
-    color: "from-teal-500 to-cyan-600",
-    badgeBg: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20",
+    dotColor: "bg-[#2bc5b4]",
     placeholder: "https://www.jiosaavn.com/featured/... or /playlist/...",
     hint: "Paste JioSaavn playlist, featured, or album links for instant 320kbps HD audio streaming.",
     sampleUrl: "https://www.jiosaavn.com/featured/weekly-top-songs/8MT-LQlP35c_",
@@ -84,18 +73,13 @@ const PROVIDERS: ProviderConfig[] = [
   {
     key: "amazon",
     label: "Amazon Music",
-    icon: "🟠",
-    color: "from-amber-500 to-orange-600",
-    badgeBg: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
-    placeholder: "https://music.amazon.com/playlists/... or music.amazon.in/...",
+    dotColor: "bg-[#ff9900]",
+    placeholder: "https://music.amazon.com/playlists/... or album/...",
     hint: "Paste public Amazon Music playlist or album links. We resolve tracks for direct playback.",
   },
   {
     key: "text",
     label: "Text Tracklist",
-    icon: "📝",
-    color: "from-indigo-500 to-blue-600",
-    badgeBg: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20",
     placeholder: "Paste song titles or 'Song Name - Artist' (one per line)...",
     hint: "Paste track titles from any app or notes. 5ONG will search and build a playable playlist for you.",
   },
@@ -160,27 +144,27 @@ export default function ImportPage() {
         <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-white/30 dark:bg-emerald-400/10 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-16 right-24 h-48 w-48 rounded-full bg-pink/40 dark:bg-purple-500/15 blur-2xl pointer-events-none" />
 
-        <div className="relative max-w-2xl">
+        <div className="relative max-w-3xl">
           <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 dark:bg-white/10 dark:text-emerald-300 dark:border dark:border-white/10 px-3 py-1 text-xs font-black text-ink">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 dark:bg-white/10 dark:text-emerald-300 dark:border dark:border-white/10 px-3 py-1 text-xs font-black text-slate-900 dark:text-white">
               <Link2 size={13} className="text-mint dark:text-emerald-300" /> Universal Playlist Converter
             </span>
           </div>
 
-          <h1 className="text-3xl font-black leading-tight md:text-4xl text-ink dark:text-white">
+          <h1 className="text-3xl font-black leading-tight md:text-4xl text-slate-950 dark:text-white">
             Import Any Playlist
           </h1>
 
-          <p className="mb-4 mt-2 text-sm font-semibold text-ink/75 dark:text-white/80 md:text-base">
+          <p className="mb-5 mt-2 text-sm font-semibold text-slate-800/80 dark:text-white/80 md:text-base">
             Import your public playlists and albums directly into 5ONG from{" "}
-            <b className="text-ink dark:text-white">Spotify</b>,{" "}
-            <b className="text-ink dark:text-white">YouTube Music</b>,{" "}
-            <b className="text-ink dark:text-white">JioSaavn</b>, and{" "}
-            <b className="text-ink dark:text-white">Amazon Music</b> with zero playback limits.
+            <b className="text-slate-950 dark:text-white font-black">Spotify</b>,{" "}
+            <b className="text-slate-950 dark:text-white font-black">YouTube Music</b>,{" "}
+            <b className="text-slate-950 dark:text-white font-black">JioSaavn</b>, and{" "}
+            <b className="text-slate-950 dark:text-white font-black">Amazon Music</b> with zero playback limits.
           </p>
 
           {/* Provider Tabs / Selector Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             {PROVIDERS.map((p) => {
               const isActive = provider === p.key;
               return (
@@ -191,13 +175,19 @@ export default function ImportPage() {
                     setProvider(p.key);
                     setError(null);
                   }}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black transition cursor-pointer ${
+                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-black tracking-wide transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? "bg-ink text-white dark:bg-white dark:text-ink shadow-md scale-[1.02]"
-                      : "bg-white/60 dark:bg-white/10 text-ink/80 dark:text-white/80 hover:bg-white/90 dark:hover:bg-white/20"
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-md shadow-black/20 scale-[1.02]"
+                      : "bg-white/60 dark:bg-white/10 text-slate-800 dark:text-white/85 hover:bg-white/90 dark:hover:bg-white/20 border border-black/5 dark:border-white/10"
                   }`}
                 >
-                  <span>{p.icon}</span>
+                  {p.key === "all" ? (
+                    <Sparkles size={13} className={isActive ? "text-amber-300 dark:text-purple-600" : "text-amber-500 dark:text-amber-400"} />
+                  ) : p.key === "text" ? (
+                    <FileText size={13} className={isActive ? "text-indigo-300 dark:text-indigo-600" : "text-indigo-500 dark:text-indigo-400"} />
+                  ) : (
+                    <span className={`h-2.5 w-2.5 rounded-full ${p.dotColor} shrink-0 ring-2 ring-black/5 dark:ring-white/10`} />
+                  )}
                   <span>{p.label}</span>
                 </button>
               );
@@ -205,53 +195,68 @@ export default function ImportPage() {
           </div>
 
           {/* Tip / Hint */}
-          <p className="mb-3 text-xs font-bold text-ink/70 dark:text-white/70 flex items-center gap-1.5">
+          <p className="mb-3 text-xs font-bold text-slate-800/75 dark:text-white/75 flex items-center gap-1.5">
             <Sparkles size={13} className="text-lilac-deep dark:text-purple-300 shrink-0" />
             <span>{activeConfig.hint}</span>
           </p>
 
           {/* Input Form */}
-          <form className="flex flex-col gap-2 max-w-2xl" onSubmit={run}>
+          <form className="flex flex-col gap-2.5" onSubmit={run}>
             {provider === "text" ? (
-              <textarea
-                rows={5}
-                className="input !rounded-2xl dark:!bg-[#120d24] dark:!border-white/20 dark:!text-white dark:placeholder-white/40 font-mono text-xs resize-y"
-                placeholder={`Arijit Singh - Kesariya\nTaylor Swift - Blank Space\nEd Sheeran - Perfect\n...`}
-                value={inputVal}
-                onChange={(e) => setInputVal(e.target.value)}
-                aria-label="Track list"
-                required
-              />
-            ) : (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  className="input !rounded-2xl dark:!bg-[#120d24] dark:!border-white/20 dark:!text-white dark:placeholder-white/40 flex-1"
-                  placeholder={activeConfig.placeholder}
+              <div className="rounded-2xl p-2.5 bg-white/75 dark:bg-black/35 backdrop-blur-xl border border-black/10 dark:border-white/15 shadow-sm">
+                <textarea
+                  rows={5}
+                  className="w-full bg-transparent p-2 text-xs font-mono text-ink dark:text-white placeholder:text-muted/70 outline-none resize-y"
+                  placeholder={`Arijit Singh - Kesariya\nTaylor Swift - Blank Space\nEd Sheeran - Perfect\n...`}
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
-                  aria-label="Playlist link"
+                  aria-label="Track list"
                   required
                 />
+                <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/10 px-2">
+                  <span className="text-[11px] text-muted font-bold">One song per line</span>
+                  <button
+                    type="submit"
+                    className="btn btn-primary !rounded-xl !py-2 !px-4 text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5"
+                    disabled={busy || !inputVal.trim()}
+                  >
+                    {busy ? <Spinner size={14} /> : <FileText size={14} />}
+                    <span>{busy ? "Matching tracks…" : "Import Tracklist"}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 rounded-2xl bg-white/75 dark:bg-black/35 backdrop-blur-xl border border-black/10 dark:border-white/15 shadow-sm focus-within:border-lilac-deep/40 dark:focus-within:border-white/30 transition">
+                <div className="flex items-center gap-2.5 flex-1 px-3 py-2 sm:py-0 min-w-0">
+                  <Link2 size={17} className="text-muted shrink-0" />
+                  <input
+                    type="url"
+                    className="w-full bg-transparent border-none outline-none text-sm font-semibold text-ink dark:text-white placeholder:text-muted/70 min-w-0"
+                    placeholder={activeConfig.placeholder}
+                    value={inputVal}
+                    onChange={(e) => setInputVal(e.target.value)}
+                    aria-label="Playlist link"
+                    required
+                  />
+                  {inputVal && (
+                    <button
+                      type="button"
+                      onClick={() => setInputVal("")}
+                      className="text-[11px] font-bold text-muted hover:text-ink dark:hover:text-white px-1.5 py-0.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <button
                   type="submit"
-                  className="btn btn-primary shrink-0 cursor-pointer"
+                  className="btn btn-primary !rounded-xl !py-3 !px-5 font-black text-xs md:text-sm shadow-md shrink-0 cursor-pointer flex items-center justify-center gap-2"
                   disabled={busy || !inputVal.trim()}
                 >
                   {busy ? <Spinner size={16} /> : <Link2 size={16} />}
                   <span>{busy ? "Resolving tracks…" : "Import Playlist"}</span>
                 </button>
               </div>
-            )}
-
-            {provider === "text" && (
-              <button
-                type="submit"
-                className="btn btn-primary self-start cursor-pointer"
-                disabled={busy || !inputVal.trim()}
-              >
-                {busy ? <Spinner size={16} /> : <FileText size={16} />}
-                <span>{busy ? "Matching tracks…" : "Import Tracklist"}</span>
-              </button>
             )}
 
             {/* Quick Sample Button if provided */}
