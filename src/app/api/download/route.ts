@@ -1,10 +1,22 @@
 import { resolveAudioStream } from "@/lib/audioResolver";
+import { downloadYouTubeAudioForTrack } from "@/lib/youtubeDownloader";
 import NodeID3 from "node-id3";
 
 export const dynamic = "force-dynamic";
 
 function safe(s: string) {
   return s.replace(/[\\/:*?"<>|]+/g, "").trim() || "track";
+}
+
+function isPreview(url: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes("preview") ||
+    url.includes("dzcdn.net") ||
+    url.includes("itunes.apple.com") ||
+    url.includes("/api/stream/") ||
+    url.includes("audio-ssl")
+  );
 }
 
 export async function POST(req: Request) {
@@ -18,23 +30,45 @@ export async function POST(req: Request) {
     const title = track.title;
     const artist = track.artist || "";
     const album = track.album || "";
-    const coverUrl = track.coverBig || track.cover || "";
+    let coverUrl = track.coverBig || track.cover || "";
 
     let audioUrl = track.audioUrl || track.streamUrl || "";
-    if (!audioUrl || audioUrl.includes("preview")) {
+    if (!audioUrl || isPreview(audioUrl)) {
       audioUrl = await resolveAudioStream(title, artist);
     }
-    if (!audioUrl && track.preview_url) {
-      audioUrl = track.preview_url;
+
+    let audioBuf: Buffer | null = null;
+    if (!audioUrl || isPreview(audioUrl)) {
+      let vid = "";
+      if (track.id?.startsWith("yt-")) {
+        vid = track.id.replace("yt-", "");
+      } else if (track.youtube_url) {
+        const match = track.youtube_url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (match) vid = match[1];
+      }
+      const ytResult = await downloadYouTubeAudioForTrack({
+        videoId: vid,
+        title,
+        artist,
+      });
+      if (ytResult?.buffer) {
+        audioBuf = ytResult.buffer;
+        audioUrl = "youtube-stream.mp3";
+        if (!coverUrl && ytResult.videoId) {
+          coverUrl = `https://i.ytimg.com/vi/${ytResult.videoId}/maxresdefault.jpg`;
+        }
+      }
     }
 
-    if (!audioUrl) {
+    if (!audioUrl && !audioBuf) {
       return Response.json({ error: "Audio stream not found" }, { status: 404 });
     }
 
-    const audioRes = await fetch(audioUrl, { cache: "no-store" });
-    if (!audioRes.ok) throw new Error("Failed to fetch upstream audio");
-    const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+    if (!audioBuf) {
+      const audioRes = await fetch(audioUrl, { cache: "no-store" });
+      if (!audioRes.ok) throw new Error("Failed to fetch upstream audio");
+      audioBuf = Buffer.from(await audioRes.arrayBuffer());
+    }
 
     // Detect if upstream audio is MP4 / M4A container (standard for JioSaavn AAC streams)
     const isMp4 =
@@ -86,7 +120,7 @@ export async function POST(req: Request) {
 
     const filename = `${safe(artist || "Artist")} - ${safe(title || "Track")} [${quality}k].${ext}`;
 
-    return new Response(finalBuffer, {
+    return new Response(finalBuffer as any, {
       status: 200,
       headers: {
         "Content-Type": contentType,

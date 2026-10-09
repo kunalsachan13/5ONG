@@ -2,6 +2,7 @@ import { getPreview } from "@/lib/deezer";
 import { resolveAudioStream } from "@/lib/audioResolver";
 import { tagM4a } from "@/lib/m4aMetadata";
 import { fetchRawLyrics } from "@/lib/lyricsFetcher";
+import { downloadYouTubeAudioForTrack } from "@/lib/youtubeDownloader";
 import NodeID3 from "node-id3";
 
 export const dynamic = "force-dynamic";
@@ -10,46 +11,15 @@ function safe(s: string) {
   return s.replace(/[\\/:*?"<>|]+/g, "").trim() || "track";
 }
 
-async function resolveYouTubeAudioBuffer(videoId: string): Promise<Buffer | null> {
-  try {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const startRes = await fetch(
-      `https://p.savenow.to/ajax/download.php?format=mp3&url=${encodeURIComponent(url)}`,
-      {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-        signal: AbortSignal.timeout(8000),
-      }
-    );
-    if (!startRes.ok) return null;
-    const startData = (await startRes.json()) as any;
-    if (!startData?.success || !startData?.id) return null;
-
-    const jobId = startData.id;
-    const progressEndpoint = `https://p.savenow.to/api/progress?id=${encodeURIComponent(jobId)}`;
-
-    for (let i = 0; i < 15; i++) {
-      await new Promise((r) => setTimeout(r, 1200));
-      try {
-        const pRes = await fetch(progressEndpoint, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-          signal: AbortSignal.timeout(6000),
-        });
-        if (!pRes.ok) continue;
-        const pData = (await pRes.json()) as any;
-        if (pData?.success === 1 && pData?.download_url) {
-          const audioRes = await fetch(pData.download_url, {
-            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-            signal: AbortSignal.timeout(25000),
-          });
-          if (audioRes.ok) {
-            const ab = await audioRes.arrayBuffer();
-            return Buffer.from(ab);
-          }
-        }
-      } catch (_) {}
-    }
-  } catch (_) {}
-  return null;
+function isPreview(url: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes("preview") ||
+    url.includes("dzcdn.net") ||
+    url.includes("itunes.apple.com") ||
+    url.includes("/api/stream/") ||
+    url.includes("audio-ssl")
+  );
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -61,6 +31,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const coverUrl = searchParams.get("cover") || "";
   const streamParam = searchParams.get("stream") || "";
   const durationParam = searchParams.get("duration") || "";
+  const videoIdParam = searchParams.get("videoId") || "";
   const wanted = Number(searchParams.get("quality") ?? 320);
 
   let targetTitle = title;
@@ -69,9 +40,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   let targetCover = coverUrl;
   const targetDuration = Number(durationParam) || 0;
 
-  // 1. Direct stream passed from active playback (non-YouTube)
+  // 1. Direct stream passed from active playback (must be full-length, never a 30s preview)
   let audioUrl = "";
-  if (streamParam && streamParam.startsWith("http") && !streamParam.includes("youtube.com") && !streamParam.includes("youtu.be")) {
+  if (
+    streamParam &&
+    streamParam.startsWith("http") &&
+    !streamParam.includes("youtube.com") &&
+    !streamParam.includes("youtu.be") &&
+    !isPreview(streamParam)
+  ) {
     audioUrl = streamParam;
   }
 
@@ -89,56 +66,47 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   // 3. Resolve full-length 320kbps audio stream from JioSaavn CDN
   if (!audioUrl && targetTitle) {
     try {
-      audioUrl = await resolveAudioStream(targetTitle, targetArtist);
+      const saavnUrl = await resolveAudioStream(targetTitle, targetArtist);
+      if (saavnUrl && !isPreview(saavnUrl)) {
+        audioUrl = saavnUrl;
+      }
     } catch (_) {}
-  }
-
-  // 4. If not found and numeric ID, fallback to Deezer preview
-  if (!audioUrl && /^\d+$/.test(id)) {
-    const entry = await getPreview(id);
-    if (entry?.url) {
-      audioUrl = entry.url;
-    }
   }
 
   let audioBuf: Buffer | null = null;
 
-  // 5. If audioUrl still not found, check if it's a YouTube track or resolve via YouTube
-  let ytVideoId = "";
-  if (id.startsWith("yt-") || id.startsWith("yt_")) {
-    ytVideoId = id.replace(/^yt[-_]/, "");
-  } else if (streamParam && (streamParam.includes("youtu.be/") || streamParam.includes("watch?v="))) {
-    const match = streamParam.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (match) ytVideoId = match[1];
+  // 4. If JioSaavn did not have the song (e.g. "Official Stream" / international track),
+  // download the FULL song via YouTube!
+  let ytVideoId = videoIdParam.trim();
+  if (!ytVideoId) {
+    if (id.startsWith("yt-") || id.startsWith("yt_")) {
+      ytVideoId = id.replace(/^yt[-_]/, "");
+    } else if (streamParam && (streamParam.includes("youtu.be/") || streamParam.includes("watch?v="))) {
+      const match = streamParam.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (match) ytVideoId = match[1];
+    }
   }
 
-  if (!audioUrl && !ytVideoId && targetTitle) {
-    try {
-      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(targetTitle + " " + targetArtist + " official audio")}`;
-      const ytRes = await fetch(searchUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: AbortSignal.timeout(4500),
-      });
-      if (ytRes.ok) {
-        const html = await ytRes.text();
-        const m = html.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
-        if (m && m[1]) {
-          ytVideoId = m[1];
-        }
-      }
-    } catch (_) {}
-  }
-
-  if (!audioUrl && ytVideoId) {
-    audioBuf = await resolveYouTubeAudioBuffer(ytVideoId);
-    if (audioBuf) {
+  if (!audioUrl) {
+    const ytResult = await downloadYouTubeAudioForTrack({
+      videoId: ytVideoId,
+      title: targetTitle,
+      artist: targetArtist,
+    });
+    if (ytResult?.buffer) {
+      audioBuf = ytResult.buffer;
       audioUrl = "youtube-stream.mp3";
-      if (!targetCover) {
-        targetCover = `https://i.ytimg.com/vi/${ytVideoId}/maxresdefault.jpg`;
+      if (!targetCover && ytResult.videoId) {
+        targetCover = `https://i.ytimg.com/vi/${ytResult.videoId}/maxresdefault.jpg`;
       }
+    }
+  }
+
+  // 5. Absolute last-ditch fallback only if full audio from both JioSaavn and YouTube failed
+  if (!audioUrl && !audioBuf && /^\d+$/.test(id)) {
+    const entry = await getPreview(id);
+    if (entry?.url) {
+      audioUrl = entry.url;
     }
   }
 

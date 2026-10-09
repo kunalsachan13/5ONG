@@ -1181,10 +1181,33 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         quality: String(quality),
       });
 
-      if (t.audioUrl && t.audioUrl.startsWith("http")) {
-        params.set("stream", t.audioUrl);
-      } else if (t.streamUrl && t.streamUrl.startsWith("http")) {
-        params.set("stream", t.streamUrl);
+      const isPreview = (url?: string) =>
+        Boolean(
+          url &&
+            (url.includes("preview") ||
+              url.includes("dzcdn.net") ||
+              url.includes("itunes.apple.com") ||
+              url.includes("/api/stream/") ||
+              url.includes("audio-ssl"))
+        );
+
+      const rawStream = t.audioUrl || t.streamUrl;
+      if (rawStream && rawStream.startsWith("http") && !isPreview(rawStream)) {
+        params.set("stream", rawStream);
+      }
+
+      let activeVid: string | null = null;
+      if (t.id && t.id.startsWith("yt-")) {
+        activeVid = t.id.replace("yt-", "");
+      } else if (t.youtube_url) {
+        const match = t.youtube_url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (match) activeVid = match[1];
+      } else if (youtubeAudio.activeVideoId && (current?.id === t.id || sourceType === "youtube")) {
+        activeVid = youtubeAudio.activeVideoId;
+      }
+
+      if (activeVid) {
+        params.set("videoId", activeVid);
       }
 
       const downloadRelUrl = `/api/download/${encodeURIComponent(t.id)}?${params.toString()}`;
@@ -1265,7 +1288,7 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
         setTimeout(() => a.remove(), 2500);
       }
     },
-    [toast],
+    [toast, current?.id, sourceType],
   );
 
   /* ------------------------------------ rooms ------------------------------------ */
