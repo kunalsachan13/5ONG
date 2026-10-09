@@ -34,8 +34,17 @@ class YouTubeAudioService {
   private containerId = 'song-hidden-yt-player-container';
   private targetDivId = 'song-hidden-yt-player';
   private videoIdCache: Map<string, string> = new Map();
+  private mvVideoIdCache: Map<string, string> = new Map();
 
   private _wasPlayingBeforeHidden = false;
+
+  // Visual Video & Companion mode properties
+  public isVisualCompanion = false;
+  private visualCompanionVideoId: string | null = null;
+  private isVideoVisible = false;
+  private videoMountElement: HTMLElement | null = null;
+  private isVideoFullscreen = false;
+  private repositionInterval: any = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -56,6 +65,12 @@ class YouTubeAudioService {
           }
         } else {
           this._wasPlayingBeforeHidden = false;
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (this.isVideoVisible) {
+          this.updateVideoPosition();
         }
       });
     }
@@ -101,9 +116,9 @@ class YouTubeAudioService {
       container.style.width = '160px';
       container.style.height = '160px';
       container.style.overflow = 'hidden';
-      container.style.opacity = '0.01';
+      container.style.opacity = '0.001';
       container.style.pointerEvents = 'none';
-      container.style.zIndex = '1';
+      container.style.zIndex = '-9999';
       document.body.appendChild(container);
     }
 
@@ -111,6 +126,8 @@ class YouTubeAudioService {
     if (!target) {
       target = document.createElement('div');
       target.id = this.targetDivId;
+      target.style.width = '100%';
+      target.style.height = '100%';
       container.appendChild(target);
     }
 
@@ -264,9 +281,44 @@ class YouTubeAudioService {
     return null;
   }
 
+  public async resolveMusicVideoId(title: string, artist?: string): Promise<string | null> {
+    const query = `${title || ''} ${artist || ''}`.trim();
+    if (!query) return null;
+
+    const cacheKey = `mv:${query.toLowerCase()}`;
+    if (this.mvVideoIdCache.has(cacheKey)) {
+      return this.mvVideoIdCache.get(cacheKey)!;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(`/api/yt-resolve?q=${encodeURIComponent(query)}&type=video`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.videoId) {
+          this.mvVideoIdCache.set(cacheKey, data.videoId);
+          return data.videoId;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback to general resolveVideoId
+    const fallbackId = await this.resolveVideoId(title, artist);
+    if (fallbackId) {
+      this.mvVideoIdCache.set(cacheKey, fallbackId);
+      return fallbackId;
+    }
+    return null;
+  }
+
   public async play(videoId: string): Promise<boolean> {
     if (typeof window === 'undefined') return false;
 
+    this.isVisualCompanion = false;
     this.initIframeApi();
     this.ensureContainer();
 
@@ -282,8 +334,8 @@ class YouTubeAudioService {
       return new Promise((resolve) => {
         try {
           this.player = new window.YT.Player(this.targetDivId, {
-            height: '200',
-            width: '200',
+            height: '100%',
+            width: '100%',
             videoId: videoId,
             playerVars: {
               autoplay: 1,
@@ -354,6 +406,218 @@ class YouTubeAudioService {
     }
   }
 
+  public showVideo(mountElement?: HTMLElement | null, isFullscreen?: boolean) {
+    if (typeof window === 'undefined') return;
+    this.isVideoVisible = true;
+    this.videoMountElement = mountElement || null;
+    this.isVideoFullscreen = Boolean(isFullscreen);
+
+    this.ensureContainer();
+    this.updateVideoPosition();
+
+    if (!this.repositionInterval) {
+      this.repositionInterval = setInterval(() => {
+        if (this.isVideoVisible) {
+          this.updateVideoPosition();
+        }
+      }, 120);
+    }
+  }
+
+  public updateVideoPosition() {
+    const container = document.getElementById(this.containerId);
+    if (!container || !this.isVideoVisible) return;
+
+    if (this.isVideoFullscreen || !this.videoMountElement) {
+      // Fullscreen cinema mode
+      container.style.position = 'fixed';
+      container.style.top = '0px';
+      container.style.left = '0px';
+      container.style.bottom = 'auto';
+      container.style.right = 'auto';
+      container.style.width = '100vw';
+      container.style.height = '100vh';
+      container.style.borderRadius = '0px';
+      container.style.boxShadow = 'none';
+      container.style.zIndex = '72';
+      container.style.opacity = '1';
+      container.style.pointerEvents = 'auto';
+      container.style.backgroundColor = '#000000';
+      container.style.display = 'flex';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'center';
+      container.style.overflow = 'hidden';
+      container.style.transition = 'opacity 0.25s ease';
+    } else {
+      // Embedded viewport in NowPlaying
+      const rect = this.videoMountElement.getBoundingClientRect();
+      container.style.position = 'fixed';
+      container.style.top = `${rect.top}px`;
+      container.style.left = `${rect.left}px`;
+      container.style.bottom = 'auto';
+      container.style.right = 'auto';
+      container.style.width = `${rect.width}px`;
+      container.style.height = `${rect.height}px`;
+      container.style.borderRadius = '1.5rem';
+      container.style.boxShadow = '0 20px 50px rgba(0,0,0,0.8)';
+      container.style.zIndex = '72';
+      container.style.opacity = '1';
+      container.style.pointerEvents = 'auto';
+      container.style.backgroundColor = '#000000';
+      container.style.display = 'block';
+      container.style.overflow = 'hidden';
+      container.style.transition = 'opacity 0.25s ease';
+    }
+
+    const iframe = container.querySelector('iframe');
+    if (iframe) {
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.pointerEvents = 'auto';
+    }
+  }
+
+  public hideVideo() {
+    this.isVideoVisible = false;
+    this.videoMountElement = null;
+    this.isVideoFullscreen = false;
+    if (this.repositionInterval) {
+      clearInterval(this.repositionInterval);
+      this.repositionInterval = null;
+    }
+
+    const container = document.getElementById(this.containerId);
+    if (container) {
+      container.style.position = 'fixed';
+      container.style.top = 'auto';
+      container.style.left = 'auto';
+      container.style.bottom = '0px';
+      container.style.right = '0px';
+      container.style.width = '160px';
+      container.style.height = '160px';
+      container.style.borderRadius = '0px';
+      container.style.boxShadow = 'none';
+      container.style.opacity = '0.001';
+      container.style.pointerEvents = 'none';
+      container.style.zIndex = '-9999';
+      container.style.backgroundColor = 'transparent';
+    }
+
+    if (this.isVisualCompanion && this.player && typeof this.player.pauseVideo === 'function') {
+      try {
+        this.player.pauseVideo();
+      } catch (_) {}
+    }
+  }
+
+  public async syncVisualCompanion(params: {
+    videoId: string;
+    currentTime: number;
+    isPlaying: boolean;
+  }): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+
+    this.isVisualCompanion = true;
+    this.initIframeApi();
+    this.ensureContainer();
+
+    const apiLoaded = await this.waitForApi();
+    if (!apiLoaded) return false;
+
+    if (!this.player) {
+      this.visualCompanionVideoId = params.videoId;
+      this.currentVideoId = params.videoId;
+      return new Promise((resolve) => {
+        try {
+          this.player = new window.YT.Player(this.targetDivId, {
+            height: '100%',
+            width: '100%',
+            videoId: params.videoId,
+            playerVars: {
+              autoplay: params.isPlaying ? 1 : 0,
+              controls: 0,
+              disablekb: 1,
+              fs: 0,
+              playsinline: 1,
+              rel: 0,
+              modestbranding: 1,
+              enablejsapi: 1,
+              origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+              start: Math.floor(params.currentTime),
+            },
+            events: {
+              onReady: (event: any) => {
+                this.isPlayerReady = true;
+                try {
+                  event.target.mute();
+                  if (params.isPlaying) {
+                    event.target.playVideo();
+                  } else {
+                    event.target.pauseVideo();
+                  }
+                  if (params.currentTime > 0) {
+                    event.target.seekTo(params.currentTime, true);
+                  }
+                } catch (_) {}
+                resolve(true);
+              },
+              onStateChange: (event: any) => {
+                if (this.isVisualCompanion) {
+                  try {
+                    event.target.mute();
+                  } catch (_) {}
+                }
+              },
+              onError: () => resolve(false),
+            },
+          });
+        } catch (_) {
+          resolve(false);
+        }
+      });
+    }
+
+    const ready = await this.waitForPlayerReady();
+    if (!ready) return false;
+
+    try {
+      if (typeof this.player.mute === 'function') {
+        this.player.mute();
+      }
+
+      if (this.visualCompanionVideoId !== params.videoId) {
+        this.visualCompanionVideoId = params.videoId;
+        this.currentVideoId = params.videoId;
+        if (typeof this.player.loadVideoById === 'function') {
+          this.player.loadVideoById({
+            videoId: params.videoId,
+            startSeconds: Math.floor(params.currentTime),
+          });
+        }
+      }
+
+      if (params.isPlaying) {
+        const state = typeof this.player.getPlayerState === 'function' ? this.player.getPlayerState() : -1;
+        if (state !== 1 && typeof this.player.playVideo === 'function') {
+          this.player.playVideo();
+        }
+      } else {
+        if (typeof this.player.pauseVideo === 'function') {
+          this.player.pauseVideo();
+        }
+      }
+
+      const ytCurrent = this.getCurrentTime();
+      if (Math.abs(ytCurrent - params.currentTime) > 1.5) {
+        this.seekTo(params.currentTime);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   public pause() {
     this._wasPlayingBeforeHidden = false;
     if (this.player && typeof this.player.pauseVideo === 'function') {
@@ -376,6 +640,9 @@ class YouTubeAudioService {
 
   public stop() {
     this.pause();
+    this.hideVideo();
+    this.isVisualCompanion = false;
+    this.visualCompanionVideoId = null;
     if (this.player && typeof this.player.stopVideo === 'function') {
       try {
         this.player.stopVideo();
@@ -396,6 +663,7 @@ class YouTubeAudioService {
 
   public setVolume(vol: number) {
     this.currentVolume = Math.max(0, Math.min(1, vol));
+    if (this.isVisualCompanion) return;
     if (this.player && typeof this.player.setVolume === 'function') {
       try {
         this.player.setVolume(Math.round(this.currentVolume * 100));
@@ -414,6 +682,7 @@ class YouTubeAudioService {
 
   public unMute() {
     this.isMuted = false;
+    if (this.isVisualCompanion) return;
     if (this.player && typeof this.player.unMute === 'function') {
       try {
         this.player.unMute();
@@ -455,6 +724,16 @@ class YouTubeAudioService {
   }
 
   private handleStateChange(state: number) {
+    // If playing as visual companion, ensure it stays strictly muted and don't trigger track finish
+    if (this.isVisualCompanion) {
+      if (state === 1 && this.player && typeof this.player.mute === 'function') {
+        try {
+          this.player.mute();
+        } catch (_) {}
+      }
+      return;
+    }
+
     // YT.PlayerState: UNSTARTED (-1), ENDED (0), PLAYING (1), PAUSED (2), BUFFERING (3), CUED (5)
     if (state === 1 && this.player) {
       try {

@@ -1779,6 +1779,9 @@ export default function PlayerProvider({ children }: { children: ReactNode }) {
       if (e.key === "F11") {
         e.preventDefault();
         if (!document.fullscreenElement) {
+          if (kb.current.current) {
+            setPanel("player");
+          }
           document.documentElement.requestFullscreen().catch(() => {});
         } else {
           document.exitFullscreen().catch(() => {});
