@@ -3,15 +3,13 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get('q') || '';
-  const type = searchParams.get('type') || 'audio';
   if (!q.trim()) {
     return Response.json({ error: 'Query parameter q is required' }, { status: 400 });
   }
 
   try {
     const cleanQ = q.trim();
-    const querySuffix = type === 'video' || type === 'mv' ? 'official music video' : 'official audio';
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQ + ' ' + querySuffix)}`;
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQ + ' official audio')}`;
     const response = await fetch(searchUrl, {
       headers: {
         'User-Agent':
@@ -46,7 +44,7 @@ export async function GET(req: Request) {
       } catch (_) {}
     }
 
-    // 2. Score candidates to pick the best matching official song / music video
+    // 2. Score candidates to pick the best matching official song
     if (candidates.length > 0) {
       const qWords = cleanQ.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
 
@@ -62,7 +60,6 @@ export async function GET(req: Request) {
           titleLower.includes('10 hour') ||
           titleLower.includes('reaction') ||
           titleLower.includes('tutorial') ||
-          titleLower.includes('how to') ||
           titleLower.includes('cover')
         ) {
           continue;
@@ -74,16 +71,9 @@ export async function GET(req: Request) {
           if (chanLower.includes(w)) score += 2;
         }
 
-        if (type === 'video' || type === 'mv') {
-          if (titleLower.includes('official music video') || titleLower.includes('official video')) score += 8;
-          if (titleLower.includes('music video')) score += 5;
-          if (chanLower.includes('vevo')) score += 4;
-          if (titleLower.includes('official audio') || titleLower.includes('audio')) score += 2;
-        } else {
-          if (titleLower.includes('official audio') || titleLower.includes('audio')) score += 4;
-          if (titleLower.includes('official music video') || titleLower.includes('official video')) score += 3;
-          if (chanLower.includes('topic') || chanLower.includes('vevo')) score += 3;
-        }
+        if (titleLower.includes('official audio') || titleLower.includes('audio')) score += 4;
+        if (titleLower.includes('official music video') || titleLower.includes('official video')) score += 3;
+        if (chanLower.includes('topic') || chanLower.includes('vevo')) score += 3;
 
         if (score > bestScore) {
           bestScore = score;

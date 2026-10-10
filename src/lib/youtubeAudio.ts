@@ -34,7 +34,6 @@ class YouTubeAudioService {
   private containerId = 'song-hidden-yt-player-container';
   private targetDivId = 'song-hidden-yt-player';
   private videoIdCache: Map<string, string> = new Map();
-  private mvVideoIdCache: Map<string, string> = new Map();
 
   private _wasPlayingBeforeHidden = false;
 
@@ -102,9 +101,9 @@ class YouTubeAudioService {
       container.style.width = '160px';
       container.style.height = '160px';
       container.style.overflow = 'hidden';
-      container.style.opacity = '0.001';
+      container.style.opacity = '0.01';
       container.style.pointerEvents = 'none';
-      container.style.zIndex = '-9999';
+      container.style.zIndex = '1';
       document.body.appendChild(container);
     }
 
@@ -112,8 +111,6 @@ class YouTubeAudioService {
     if (!target) {
       target = document.createElement('div');
       target.id = this.targetDivId;
-      target.style.width = '100%';
-      target.style.height = '100%';
       container.appendChild(target);
     }
 
@@ -267,40 +264,6 @@ class YouTubeAudioService {
     return null;
   }
 
-  public async resolveMusicVideoId(title: string, artist?: string): Promise<string | null> {
-    const query = `${title || ''} ${artist || ''}`.trim();
-    if (!query) return null;
-
-    const cacheKey = `mv:${query.toLowerCase()}`;
-    if (this.mvVideoIdCache.has(cacheKey)) {
-      return this.mvVideoIdCache.get(cacheKey)!;
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch(`/api/yt-resolve?q=${encodeURIComponent(query)}&type=video`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.videoId) {
-          this.mvVideoIdCache.set(cacheKey, data.videoId);
-          return data.videoId;
-        }
-      }
-    } catch (_) {}
-
-    // Fallback to general resolveVideoId
-    const fallbackId = await this.resolveVideoId(title, artist);
-    if (fallbackId) {
-      this.mvVideoIdCache.set(cacheKey, fallbackId);
-      return fallbackId;
-    }
-    return null;
-  }
-
   public async play(videoId: string): Promise<boolean> {
     if (typeof window === 'undefined') return false;
 
@@ -319,8 +282,8 @@ class YouTubeAudioService {
       return new Promise((resolve) => {
         try {
           this.player = new window.YT.Player(this.targetDivId, {
-            height: '100%',
-            width: '100%',
+            height: '200',
+            width: '200',
             videoId: videoId,
             playerVars: {
               autoplay: 1,

@@ -265,9 +265,6 @@ export default function PlayerBar() {
             title={isFullscreen ? "Exit full-screen (F11)" : "Full-screen (F11)"}
             onClick={() => {
               if (!document.fullscreenElement) {
-                if (p.current) {
-                  p.setPanel("player");
-                }
                 document.documentElement.requestFullscreen().catch(() => {});
               } else {
                 document.exitFullscreen().catch(() => {});
