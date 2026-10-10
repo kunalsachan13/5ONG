@@ -63,13 +63,13 @@ interface MainPlayerLayoutProps {
   isFullscreen: boolean;
   toggleFullscreen: () => void;
   mvVideoId: string | null;
+  videoStreamUrl: string | null;
   isResolvingVideo: boolean;
-  videoViewportRef: React.RefObject<HTMLDivElement | null>;
   controlsVisible: boolean;
 }
 
 /**
- * Main Player View matching Spotify/Apple Music aesthetics with Cover-Driven Theming and Music Video Cinema
+ * Main Player View matching Spotify/Apple Music aesthetics with Cover-Driven Theming and Native Music Video Background
  */
 function MainPlayerLayout({
   theme,
@@ -78,8 +78,8 @@ function MainPlayerLayout({
   isFullscreen,
   toggleFullscreen,
   mvVideoId,
+  videoStreamUrl,
   isResolvingVideo,
-  videoViewportRef,
   controlsVisible,
 }: MainPlayerLayoutProps) {
   const p = usePlayer();
@@ -87,7 +87,34 @@ function MainPlayerLayout({
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubValue, setScrubValue] = useState(0);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+
   const t = p.current;
+
+  // Synchronize native video playback with audio engine
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    if (p.playing) {
+      vid.play().catch(() => {});
+    } else {
+      vid.pause();
+    }
+  }, [p.playing]);
+
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    if (Math.abs(vid.currentTime - p.position) > 1.2) {
+      vid.currentTime = p.position;
+    }
+  }, [p.position]);
+
+  // Reset video ready state when track changes
+  useEffect(() => {
+    setIsVideoReady(false);
+  }, [videoStreamUrl]);
 
   if (!t) {
     return (
@@ -101,267 +128,297 @@ function MainPlayerLayout({
   const currentPos = isScrubbing ? scrubValue : p.position;
   const pct = p.duration ? Math.max(0, Math.min(100, (currentPos / p.duration) * 100)) : 0;
 
-  // 1. Fullscreen Cinema HUD layout
+  // 1. Fullscreen Cinema Layout with Direct Video Background
   if (isFullscreen) {
     return (
-      <div
-        className={`fixed inset-0 z-[80] flex flex-col justify-between transition-opacity duration-300 pointer-events-none select-none ${
-          controlsVisible ? "opacity-100" : "opacity-0 cursor-none"
-        }`}
-      >
-        {/* Top Header Scrim & Track Info */}
-        <div className="relative pointer-events-auto bg-gradient-to-b from-black/85 via-black/45 to-transparent px-6 pt-5 pb-12 flex items-center justify-between">
-          <div className="flex items-center gap-3.5 max-w-[60%]">
-            <Cover
-              src={t.coverBig || t.cover}
-              size={52}
-              rounded="rounded-2xl"
-              className="w-13 h-13 shadow-xl shrink-0 border border-white/20"
+      <div className="fixed inset-0 z-[80] overflow-hidden bg-black select-none">
+        {/* Native Direct Music Video Background (No YouTube iframe!) */}
+        {videoMode && videoStreamUrl ? (
+          <div className="absolute inset-0 w-full h-full overflow-hidden bg-black">
+            <video
+              ref={videoRef}
+              src={videoStreamUrl}
+              autoPlay
+              playsInline
+              muted
+              loop
+              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 z-0 pointer-events-none"
+              style={{ opacity: isVideoReady ? 1 : 0 }}
+              onLoadedData={() => setIsVideoReady(true)}
             />
-            <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-black text-white truncate drop-shadow-md">
-                {t.title}
-              </h2>
-              <p className="text-xs sm:text-sm font-semibold text-white/75 truncate">
-                {t.artist}
-              </p>
-            </div>
-            <span
-              className="hidden sm:inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black border shadow-sm shrink-0"
-              style={{
-                backgroundColor: `${theme.primary}35`,
-                color: theme.accent,
-                borderColor: `${theme.accent}60`,
-              }}
-            >
-              <Video size={13} />
-              <span>Official Music Video</span>
-            </span>
+            {/* Cinematic subtle gradient scrim for high readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/60 pointer-events-none z-10" />
           </div>
+        ) : null}
 
-          <div className="flex items-center gap-2.5">
-            {/* Song / Video toggle in Fullscreen */}
-            <div className="flex items-center rounded-full p-1 bg-black/60 backdrop-blur-xl border border-white/20 shadow-lg">
-              <button
-                type="button"
-                onClick={() => setVideoMode(false)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
-                  !videoMode ? "bg-white text-black shadow-md" : "text-white/70 hover:text-white"
-                }`}
-              >
-                <Music2 size={13} />
-                <span>Song</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setVideoMode(true)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
-                  videoMode ? "bg-white text-black shadow-md" : "text-white/70 hover:text-white"
-                }`}
-              >
-                <Video size={13} />
-                <span>Video</span>
-              </button>
-            </div>
-
-            {/* Exit Fullscreen button */}
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-black text-xs backdrop-blur-xl border border-white/20 transition active:scale-95 shadow-lg"
-              title="Exit Fullscreen (Esc or F11)"
-            >
-              <Minimize2 size={15} />
-              <span className="hidden sm:inline">Exit Fullscreen</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Center state if video mode is off or resolving */}
-        {!videoMode ? (
-          <div className="flex-1 flex items-center justify-center pointer-events-none">
-            <div
-              className="relative group rounded-3xl"
-              style={{
-                boxShadow: `0 25px 60px -10px ${theme.glow}, 0 10px 40px rgba(0,0,0,0.8)`,
-              }}
-            >
-              <Cover
-                src={t.coverBig || t.cover}
-                size={380}
-                rounded="rounded-3xl"
-                className="w-[min(65vw,360px)] aspect-square shadow-2xl"
-              />
-            </div>
-          </div>
-        ) : isResolvingVideo && !mvVideoId ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white pointer-events-none">
-            <div className="h-9 w-9 animate-spin rounded-full border-3 border-white/20 border-t-white" />
-            <span className="text-sm font-extrabold bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/15">
-              Loading Official Music Video...
-            </span>
-          </div>
-        ) : !mvVideoId && p.sourceType !== "youtube" ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-white pointer-events-none">
-            <div className="bg-black/75 backdrop-blur-md border border-white/15 px-6 py-4 rounded-3xl flex flex-col items-center gap-2 shadow-2xl">
-              <Film size={36} className="text-white/50" />
-              <span className="font-extrabold text-sm">Official music video unavailable</span>
-              <span className="text-xs text-white/60">Streaming in 320 kbps HD Audio</span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1" />
+        {/* Ambient album cover background when video is loading or videoMode is off */}
+        {(!videoMode || !isVideoReady) && t && (t.coverBig || t.cover) && (
+          <div
+            className="absolute inset-0 bg-cover bg-center filter blur-[60px] opacity-60 pointer-events-none transition-all duration-700 transform-gpu scale-110"
+            style={{ backgroundImage: `url(${t.coverBig || t.cover})` }}
+          />
         )}
 
-        {/* Bottom Floating Cinema Controls Bar */}
-        <div className="relative pointer-events-auto bg-gradient-to-t from-black/95 via-black/75 to-transparent px-6 sm:px-14 pt-16 pb-8 flex flex-col gap-3">
-          {/* Seek bar */}
-          <div className="w-full flex items-center gap-3.5">
-            <span className="w-12 text-right text-xs font-black text-white/90 tabular-nums shrink-0">
-              {fmtTime(currentPos)}
-            </span>
-            <div className="relative flex-1 flex items-center group py-2">
-              <input
-                type="range"
-                min={0}
-                max={p.duration || 1}
-                step={0.1}
-                value={currentPos}
-                onMouseDown={() => setIsScrubbing(true)}
-                onTouchStart={() => setIsScrubbing(true)}
-                onChange={(e) => setScrubValue(Number(e.target.value))}
-                onMouseUp={() => {
-                  setIsScrubbing(false);
-                  p.seek(scrubValue);
-                }}
-                onTouchEnd={() => {
-                  setIsScrubbing(false);
-                  p.seek(scrubValue);
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                aria-label="Seek time"
+        {/* Floating Auto-Hiding Cinema HUD */}
+        <div
+          className={`absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none ${
+            controlsVisible ? "opacity-100" : "opacity-0 cursor-none"
+          }`}
+        >
+          {/* Top Header Scrim & Track Info */}
+          <div className="relative pointer-events-auto bg-gradient-to-b from-black/85 via-black/45 to-transparent px-6 pt-5 pb-12 flex items-center justify-between">
+            <div className="flex items-center gap-3.5 max-w-[60%]">
+              <Cover
+                src={t.coverBig || t.cover}
+                size={52}
+                rounded="rounded-2xl"
+                className="w-13 h-13 shadow-xl shrink-0 border border-white/20"
               />
-              <div className="relative h-1.5 w-full rounded-full bg-white/25 overflow-visible">
-                <div
-                  className="h-full rounded-full transition-[width] duration-75"
-                  style={{
-                    width: `${pct}%`,
-                    background: `linear-gradient(to right, ${theme.primary}, ${theme.accent})`,
-                    boxShadow: `0 0 10px ${theme.glow}`,
-                  }}
-                />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-lg pointer-events-none transition-transform group-hover:scale-125 border-2"
-                  style={{
-                    left: `${pct}%`,
-                    borderColor: theme.accent,
-                    boxShadow: `0 0 8px ${theme.glow}`,
-                  }}
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-xl font-black text-white truncate drop-shadow-md">
+                  {t.title}
+                </h2>
+                <p className="text-xs sm:text-sm font-semibold text-white/75 truncate">
+                  {t.artist}
+                </p>
+              </div>
+              <span
+                className="hidden sm:inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black border shadow-sm shrink-0"
+                style={{
+                  backgroundColor: `${theme.primary}35`,
+                  color: theme.accent,
+                  borderColor: `${theme.accent}60`,
+                }}
+              >
+                <Video size={13} />
+                <span>Music Video Background</span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              {/* Song / Video toggle in Fullscreen */}
+              <div className="flex items-center rounded-full p-1 bg-black/60 backdrop-blur-xl border border-white/20 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => setVideoMode(false)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                    !videoMode ? "bg-white text-black shadow-md" : "text-white/70 hover:text-white"
+                  }`}
+                >
+                  <Music2 size={13} />
+                  <span>Song</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoMode(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                    videoMode ? "bg-white text-black shadow-md" : "text-white/70 hover:text-white"
+                  }`}
+                >
+                  <Video size={13} />
+                  <span>Video</span>
+                </button>
+              </div>
+
+              {/* Exit Fullscreen button */}
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-black text-xs backdrop-blur-xl border border-white/20 transition active:scale-95 shadow-lg"
+                title="Exit Fullscreen (Esc or F11)"
+              >
+                <Minimize2 size={15} />
+                <span className="hidden sm:inline">Exit Fullscreen</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Center state if video mode is off or resolving */}
+          {!videoMode ? (
+            <div className="flex-1 flex items-center justify-center pointer-events-none">
+              <div
+                className="relative group rounded-3xl"
+                style={{
+                  boxShadow: `0 25px 60px -10px ${theme.glow}, 0 10px 40px rgba(0,0,0,0.8)`,
+                }}
+              >
+                <Cover
+                  src={t.coverBig || t.cover}
+                  size={380}
+                  rounded="rounded-3xl"
+                  className="w-[min(65vw,360px)] aspect-square shadow-2xl"
                 />
               </div>
             </div>
-            <span className="w-12 text-left text-xs font-black text-white/90 tabular-nums shrink-0">
-              {fmtTime(p.duration)}
-            </span>
-          </div>
+          ) : isResolvingVideo && !videoStreamUrl ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white pointer-events-none">
+              <div className="h-9 w-9 animate-spin rounded-full border-3 border-white/20 border-t-white" />
+              <span className="text-sm font-extrabold bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/15">
+                Loading Music Video Background...
+              </span>
+            </div>
+          ) : !mvVideoId && p.sourceType !== "youtube" ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-white pointer-events-none">
+              <div className="bg-black/75 backdrop-blur-md border border-white/15 px-6 py-4 rounded-3xl flex flex-col items-center gap-2 shadow-2xl">
+                <Film size={36} className="text-white/50" />
+                <span className="font-extrabold text-sm">Official music video unavailable</span>
+                <span className="text-xs text-white/60">Streaming in 320 kbps HD Audio</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
 
-          {/* Transport buttons row */}
-          <div className="w-full flex items-center justify-between">
-            {/* Left: Like button */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="p-2.5 rounded-full hover:bg-white/10 text-white transition active:scale-95"
-                onClick={() => toggleLike(t)}
-                title={liked ? "Remove from Favorites" : "Add to Favorites"}
-              >
-                <Heart
-                  size={22}
-                  fill={liked ? "currentColor" : "none"}
-                  style={{ color: liked ? theme.accent : "#ffffff" }}
+          {/* Bottom Floating Cinema Controls Bar */}
+          <div className="relative pointer-events-auto bg-gradient-to-t from-black/95 via-black/75 to-transparent px-6 sm:px-14 pt-16 pb-8 flex flex-col gap-3">
+            {/* Seek bar */}
+            <div className="w-full flex items-center gap-3.5">
+              <span className="w-12 text-right text-xs font-black text-white/90 tabular-nums shrink-0">
+                {fmtTime(currentPos)}
+              </span>
+              <div className="relative flex-1 flex items-center group py-2">
+                <input
+                  type="range"
+                  min={0}
+                  max={p.duration || 1}
+                  step={0.1}
+                  value={currentPos}
+                  onMouseDown={() => setIsScrubbing(true)}
+                  onTouchStart={() => setIsScrubbing(true)}
+                  onChange={(e) => setScrubValue(Number(e.target.value))}
+                  onMouseUp={() => {
+                    setIsScrubbing(false);
+                    p.seek(scrubValue);
+                  }}
+                  onTouchEnd={() => {
+                    setIsScrubbing(false);
+                    p.seek(scrubValue);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  aria-label="Seek time"
                 />
-              </button>
+                <div className="relative h-1.5 w-full rounded-full bg-white/25 overflow-visible">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-75"
+                    style={{
+                      width: `${pct}%`,
+                      background: `linear-gradient(to right, ${theme.primary}, ${theme.accent})`,
+                      boxShadow: `0 0 10px ${theme.glow}`,
+                    }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-lg pointer-events-none transition-transform group-hover:scale-125 border-2"
+                    style={{
+                      left: `${pct}%`,
+                      borderColor: theme.accent,
+                      boxShadow: `0 0 8px ${theme.glow}`,
+                    }}
+                  />
+                </div>
+              </div>
+              <span className="w-12 text-left text-xs font-black text-white/90 tabular-nums shrink-0">
+                {fmtTime(p.duration)}
+              </span>
             </div>
 
-            {/* Center: Playback Controls */}
-            <div className="flex items-center gap-4 sm:gap-6">
-              <button
-                className="p-2 rounded-full transition-all active:scale-95 text-white/80 hover:text-white"
-                style={{
-                  color: p.shuffle !== "off" ? theme.accent : undefined,
-                }}
-                onClick={p.cycleShuffle}
-                title={`Shuffle: ${p.shuffle}`}
-              >
-                {p.shuffle === "smart" ? <Sparkles size={20} /> : <Shuffle size={20} />}
-              </button>
-
-              <button
-                className="p-2 rounded-full text-white hover:text-white/80 transition active:scale-95"
-                onClick={p.prev}
-                aria-label="Previous track"
-              >
-                <SkipBack size={26} fill="currentColor" />
-              </button>
-
-              <button
-                className="grid h-14 w-14 place-items-center rounded-full transition hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: theme.buttonBg,
-                  color: theme.buttonText,
-                  boxShadow: `0 8px 25px ${theme.glow}`,
-                }}
-                onClick={p.toggle}
-                aria-label={p.playing ? "Pause" : "Play"}
-              >
-                {p.playing ? (
-                  <Pause size={28} fill="currentColor" />
-                ) : (
-                  <Play size={28} fill="currentColor" className="translate-x-0.5" />
-                )}
-              </button>
-
-              <button
-                className="p-2 rounded-full text-white hover:text-white/80 transition active:scale-95"
-                onClick={p.next}
-                aria-label="Next track"
-              >
-                <SkipForward size={26} fill="currentColor" />
-              </button>
-
-              <button
-                className="p-2 rounded-full transition-all active:scale-95 text-white/80 hover:text-white"
-                style={{
-                  color: p.repeat !== "off" ? theme.accent : undefined,
-                }}
-                onClick={p.cycleRepeat}
-                title={`Repeat: ${p.repeat}`}
-              >
-                {p.repeat === "one" ? <Repeat1 size={20} /> : <Repeat size={20} />}
-              </button>
-            </div>
-
-            {/* Right: Volume slider */}
-            <div className="flex items-center gap-3">
-              <div className="hidden md:flex items-center gap-2">
+            {/* Transport buttons row */}
+            <div className="w-full flex items-center justify-between">
+              {/* Left: Like button */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="p-2 text-white/80 hover:text-white transition"
-                  onClick={p.toggleMute}
+                  className="p-2.5 rounded-full hover:bg-white/10 text-white transition active:scale-95"
+                  onClick={() => toggleLike(t)}
+                  title={liked ? "Remove from Favorites" : "Add to Favorites"}
                 >
-                  {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                </button>
-                <div className="w-24">
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={p.muted ? 0 : p.volume}
-                    onChange={(e) => p.setVolume(Number(e.target.value))}
-                    className="w-full accent-white cursor-pointer h-1 rounded-full bg-white/20"
-                    aria-label="Volume"
+                  <Heart
+                    size={22}
+                    fill={liked ? "currentColor" : "none"}
+                    style={{ color: liked ? theme.accent : "#ffffff" }}
                   />
+                </button>
+              </div>
+
+              {/* Center: Playback Controls */}
+              <div className="flex items-center gap-4 sm:gap-6">
+                <button
+                  className="p-2 rounded-full transition-all active:scale-95 text-white/80 hover:text-white"
+                  style={{
+                    color: p.shuffle !== "off" ? theme.accent : undefined,
+                  }}
+                  onClick={p.cycleShuffle}
+                  title={`Shuffle: ${p.shuffle}`}
+                >
+                  {p.shuffle === "smart" ? <Sparkles size={20} /> : <Shuffle size={20} />}
+                </button>
+
+                <button
+                  className="p-2 rounded-full text-white hover:text-white/80 transition active:scale-95"
+                  onClick={p.prev}
+                  aria-label="Previous track"
+                >
+                  <SkipBack size={26} fill="currentColor" />
+                </button>
+
+                <button
+                  className="grid h-14 w-14 place-items-center rounded-full transition hover:scale-105 active:scale-95"
+                  style={{
+                    backgroundColor: theme.buttonBg,
+                    color: theme.buttonText,
+                    boxShadow: `0 8px 25px ${theme.glow}`,
+                  }}
+                  onClick={p.toggle}
+                  aria-label={p.playing ? "Pause" : "Play"}
+                >
+                  {p.playing ? (
+                    <Pause size={28} fill="currentColor" />
+                  ) : (
+                    <Play size={28} fill="currentColor" className="translate-x-0.5" />
+                  )}
+                </button>
+
+                <button
+                  className="p-2 rounded-full text-white hover:text-white/80 transition active:scale-95"
+                  onClick={p.next}
+                  aria-label="Next track"
+                >
+                  <SkipForward size={26} fill="currentColor" />
+                </button>
+
+                <button
+                  className="p-2 rounded-full transition-all active:scale-95 text-white/80 hover:text-white"
+                  style={{
+                    color: p.repeat !== "off" ? theme.accent : undefined,
+                  }}
+                  onClick={p.cycleRepeat}
+                  title={`Repeat: ${p.repeat}`}
+                >
+                  {p.repeat === "one" ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                </button>
+              </div>
+
+              {/* Right: Volume slider */}
+              <div className="flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="p-2 text-white/80 hover:text-white transition"
+                    onClick={p.toggleMute}
+                  >
+                    {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                  </button>
+                  <div className="w-24">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={p.muted ? 0 : p.volume}
+                      onChange={(e) => p.setVolume(Number(e.target.value))}
+                      className="w-full accent-white cursor-pointer h-1 rounded-full bg-white/20"
+                      aria-label="Volume"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -428,24 +485,35 @@ function MainPlayerLayout({
             />
 
             <div
-              ref={videoViewportRef}
               className="relative w-full max-w-[420px] aspect-video rounded-[1.75rem] overflow-hidden bg-black/95 border border-white/15 flex items-center justify-center transition-all duration-300"
               style={{
                 boxShadow: `0 20px 50px -10px ${theme.glow}, 0 10px 30px rgba(0,0,0,0.8)`,
               }}
             >
-              {isResolvingVideo && !mvVideoId ? (
+              {videoStreamUrl ? (
+                <video
+                  ref={videoRef}
+                  src={videoStreamUrl}
+                  autoPlay
+                  playsInline
+                  muted
+                  loop
+                  className="w-full h-full object-cover transition-opacity duration-500"
+                  style={{ opacity: isVideoReady ? 1 : 0 }}
+                  onLoadedData={() => setIsVideoReady(true)}
+                />
+              ) : isResolvingVideo ? (
                 <div className="flex flex-col items-center justify-center gap-2 text-white/80">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                   <span className="text-xs font-bold">Loading Music Video...</span>
                 </div>
-              ) : !mvVideoId && p.sourceType !== "youtube" ? (
+              ) : (
                 <div className="flex flex-col items-center justify-center gap-1.5 text-white/70 text-xs px-4 text-center">
                   <Film size={26} className="text-white/40 mb-1" />
                   <span className="font-black">Music video not found</span>
                   <span className="text-[11px] text-white/45">Enjoying 320k HD Audio</span>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         ) : (
@@ -660,8 +728,8 @@ export default function NowPlaying() {
   const [videoMode, setVideoMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mvVideoId, setMvVideoId] = useState<string | null>(null);
+  const [videoStreamUrl, setVideoStreamUrl] = useState<string | null>(null);
   const [isResolvingVideo, setIsResolvingVideo] = useState(false);
-  const videoViewportRef = useRef<HTMLDivElement>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimerRef = useRef<any>(null);
 
@@ -717,12 +785,15 @@ export default function NowPlaying() {
   useEffect(() => {
     if (!t) {
       setMvVideoId(null);
+      setVideoStreamUrl(null);
       return;
     }
 
     let active = true;
     if (p.sourceType === "youtube" && (t as any).youtubeId) {
-      setMvVideoId((t as any).youtubeId);
+      const vid = (t as any).youtubeId;
+      setMvVideoId(vid);
+      setVideoStreamUrl(`/api/video-stream?v=${encodeURIComponent(vid)}&play=1`);
       return;
     }
 
@@ -730,6 +801,7 @@ export default function NowPlaying() {
     youtubeAudio.resolveMusicVideoId(t.title, t.artist).then((vid) => {
       if (active) {
         setMvVideoId(vid);
+        setVideoStreamUrl(vid ? `/api/video-stream?v=${encodeURIComponent(vid)}&play=1` : null);
         setIsResolvingVideo(false);
       }
     });
@@ -738,29 +810,6 @@ export default function NowPlaying() {
       active = false;
     };
   }, [t?.id, t?.title, t?.artist, p.sourceType]);
-
-  useEffect(() => {
-    if (!videoMode || panel !== "player" || !t) {
-      youtubeAudio.hideVideo();
-      return;
-    }
-
-    youtubeAudio.showVideo(videoViewportRef.current, isFullscreen);
-
-    if (p.sourceType !== "youtube" && mvVideoId) {
-      youtubeAudio.syncVisualCompanion({
-        videoId: mvVideoId,
-        currentTime: p.position,
-        isPlaying: p.playing,
-      });
-    }
-  }, [videoMode, panel, isFullscreen, mvVideoId, p.playing, p.position, p.sourceType, t]);
-
-  useEffect(() => {
-    return () => {
-      youtubeAudio.hideVideo();
-    };
-  }, []);
 
   // Dynamic Theme state extracted from current cover art
   const [theme, setTheme] = useState<TrackTheme>({
@@ -1192,8 +1241,8 @@ export default function NowPlaying() {
             isFullscreen={isFullscreen}
             toggleFullscreen={toggleFullscreen}
             mvVideoId={mvVideoId}
+            videoStreamUrl={videoStreamUrl}
             isResolvingVideo={isResolvingVideo}
-            videoViewportRef={videoViewportRef}
             controlsVisible={controlsVisible}
           />
         )}
